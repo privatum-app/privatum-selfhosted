@@ -62,7 +62,9 @@ docker compose up -d
 docker compose exec tor cat /run/onion/hostname
 ```
 
-O comando mostra o endereço (algo como `abc...xyz.onion`). Ele também aparece em destaque nos logs: no **Docker Desktop**, abra **Containers → privatum → tor-1** (ou **relay-1**) → **Logs** e procure “Seu Privatum está no ar”. Na primeira vez o Tor pode levar um ou dois minutos para publicar o serviço.
+O jeito mais fácil: no **Docker Desktop**, em **Containers → privatum → info-1**, clique no link **8099:8080**. Abre no seu navegador comum uma página só deste computador (`http://127.0.0.1:8099`) com o endereço `.onion`, um botão para copiá-lo e as instruções. Sem Docker Desktop, abra esse mesmo endereço no navegador.
+
+O comando acima mostra o endereço (algo como `abc...xyz.onion`). Ele também aparece em destaque nos logs: no **Docker Desktop**, abra **Containers → privatum → tor-1** (ou **relay-1**) → **Logs** e procure “Seu Privatum está no ar”. Na primeira vez o Tor pode levar um ou dois minutos para publicar o serviço.
 
 **Esse endereço identifica a sua instância.** A chave que o gera fica no volume `privatum_tor-state`; faça backup dela (veja [docs/OPERATIONS.md](docs/OPERATIONS.md)). Se você a perder, o endereço muda e todos os convites deixam de funcionar.
 

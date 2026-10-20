@@ -22,8 +22,9 @@ A última linha mostra o endereço `.onion` da instância. Na primeira vez, publ
 |---|---|---|---|
 | `relay` | `65532` (distroless *nonroot*) | só `internal` (sem acesso à internet) | somente leitura; grava apenas em `/data` |
 | `tor` | `debian-tor` | `internal` + `egress` | somente leitura; grava apenas em `/var/lib/tor` e `/run/onion` |
+| `info` | `65534` (*nobody*) | só `info` | somente leitura; serve uma página gerada em `/tmp` |
 
-Nenhuma porta é publicada no host. Os dois contêineres rodam sem *capabilities* e com `no-new-privileges`.
+O aplicativo não publica porta no host. A única porta publicada é a da página `info` (`127.0.0.1:8099`, mude com `PRIVATUM_INFO_PORT`), presa ao endereço local: ela só mostra o endereço `.onion` e não dá acesso ao Privatum. Todos os contêineres rodam sem *capabilities* e com `no-new-privileges`.
 
 ## Volumes
 

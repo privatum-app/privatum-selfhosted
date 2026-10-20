@@ -1,7 +1,8 @@
 # Privatum self-hosted instance: relay + Tor onion service.
 #   cd deploy && docker compose up -d
 #   docker compose exec tor cat /run/onion/hostname   # your .onion address (also in the tor/relay logs)
-# Nothing is published on the host: the only way in is the onion address.
+# The app is reachable only through the onion address. The "info" service publishes a
+# local-only page (127.0.0.1) that shows that address; Docker Desktop lists it as a link.
 
 name: privatum
 
@@ -46,6 +47,26 @@ services:
       - internal
       - egress
 
+  info:
+    # Local-only page with the .onion address and how to open it. It is not the app.
+    image: busybox:1.37-musl@sha256:5cec3fc171c87218698e85a52af7087de727372aae264a787b8112901a5b0092
+    restart: unless-stopped
+    depends_on: [tor]
+    read_only: true
+    user: "65534:65534"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: [/tmp]
+    command: ["/bin/sh", "/info/info.sh"]
+    volumes:
+      - ./info:/info:ro
+      - onion-hostname:/run/onion:ro
+    ports:
+      # Bound to 127.0.0.1 only: never reachable from the network.
+      - "127.0.0.1:${PRIVATUM_INFO_PORT:-8099}:8080"
+    networks:
+      - info
+
 networks:
   # The relay has no route to the internet; only tor can reach it.
   internal:
@@ -54,6 +75,8 @@ networks:
       config:
         - subnet: 172.30.0.0/24
   egress: {}
+  # Separate network for the info page, so it shares nothing with the relay.
+  info: {}
 
 volumes:
   relay-data:
