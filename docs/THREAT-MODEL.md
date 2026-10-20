@@ -61,6 +61,7 @@ Convite: `<endereço>.onion` + **impressão digital da chave de identidade** de 
 - **L5 — Dispositivo comprometido.** Malware ou acesso físico com o cliente desbloqueado lê tudo. A senha local só protege em repouso.
 - **L6 — Anonimato não é garantido.** Depende de como a pessoa hospeda e usa: VPS pago com cartão, conta de e-mail real, horários de uso e conteúdo das mensagens identificam pessoas. Hospedar em casa atrás do Tor é melhor, mas não é prova de anonimato.
 - **L7 — Disponibilidade.** O operador pode descartar, atrasar ou recusar mensagens. O protocolo detecta adulteração, não censura.
+- **L9 — O Tor Browser apaga os dados ao fechar.** Identidade, contatos e histórico só sobrevivem por meio do arquivo de backup exportado manualmente. Restaurar um backup antigo perde o que veio depois dele. Quem obtiver o arquivo pode tentar adivinhar a senha local offline (PBKDF2 com 600.000 iterações): use uma senha longa e guarde o arquivo com cuidado.
 - **L8 — Auditoria.** O protocolo (vodozemac) foi auditado em 2022; este projeto (cola WASM, relay, cliente) **não foi auditado**. Auditoria externa é pré-requisito do lançamento público (Fase 3).
 
 ## 6. Requisitos derivados da auditoria do sistema anterior

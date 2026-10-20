@@ -84,6 +84,9 @@ A instância só fica disponível enquanto o computador estiver ligado e os cont
 3. Abra o endereço `.onion` da instância e crie uma identidade com uma **senha local**. Ela cifra suas chaves e conversas só neste navegador, nunca é enviada ao servidor e **não pode ser recuperada**.
 4. Clique em **Meu convite** e envie o link, por um canal em que você confia, a quem você quer adicionar. A pessoa abre o link no Tor Browser, cria a identidade dela e adiciona você.
 5. Abra **Código de segurança** na conversa e compare os 30 dígitos com o contato, por voz ou pessoalmente.
+6. **Antes de fechar o Tor Browser, clique em "Exportar backup".** O Tor Browser apaga os dados dos sites ao fechar: sem o arquivo `.privatum`, sua identidade, contatos e histórico se perdem. Da próxima vez, abra o endereço e use **Restaurar de um backup** com a mesma senha local.
+
+O backup é cifrado com a sua senha local; quem tiver o arquivo pode tentar adivinhá-la offline, então use uma senha longa e guarde o arquivo em local seguro. Restaurar um backup antigo perde as mensagens trocadas depois dele.
 
 Cada convite abre uma conversa **individual** entre você e quem o usar; não há conversas em grupo.
 

@@ -50,7 +50,7 @@ Todas as respostas levam os cabeçalhos de R8. Tamanhos máximos e limites de ta
 | Método e rota | Autenticação | Função |
 |---|---|---|
 | `POST /v1/register` | assinatura | Cria a caixa: `{ed25519, curve25519, signature}`. O relay recalcula o `mailbox_id`. |
-| `PUT /v1/keys` | token | Envia chaves de uso único e a chave reserva (fallback), assinadas pela Ed25519. |
+| `PUT /v1/keys` | token | Envia chaves de uso único e a chave reserva (fallback), assinadas pela Ed25519. Um lote novo de chaves de uso único **substitui** o anterior (até 100 por envio). |
 | `GET /v1/keys/{mailbox_id}` | token | Devolve identidade + **uma** chave de uso único (consumida) ou a reserva. |
 | `POST /v1/messages` | token | `{to, envelope}`. O relay grava `to`, o remetente autenticado, o horário e o blob. |
 | `GET /v1/inbox` (WebSocket) | token | Entrega mensagens pendentes e novas. |
@@ -84,7 +84,10 @@ Nada de senha, chave privada (nem cifrada), nome, avatar ou lista de contatos (R
 - A chave do *pickle* vem de uma senha local via PBKDF2-SHA256 (WebCrypto) com **600.000 iterações fixas no código** (R10). A senha nunca sai do dispositivo.
 - Contatos e histórico também ficam só no dispositivo, cifrados com a mesma chave.
 - Nada em `localStorage` além de preferências visuais.
-- Backup: arquivo exportado, cifrado com a senha local. Sem backup no relay.
+- Backup: arquivo `.privatum` exportado pelo cliente, com o mesmo estado selado (AES-GCM, chave derivada da senha local) e o sal. Sem backup no relay.
+- O Tor Browser apaga os dados dos sites ao fechar, então o backup é o que preserva a identidade entre sessões.
+- Ao restaurar, as sessões Olm do backup só servem para **decifrar**: antes de enviar a cada contato, o cliente abre uma sessão nova, porque cifrar com um ratchet atrasado reutilizaria chaves de mensagem. Mensagens recebidas depois do backup em sessões que mudaram podem não ser decifráveis.
+- A cada login o cliente publica um lote novo de chaves de uso único, que substitui o anterior no relay; assim o relay não entrega chaves cujas partes privadas se perderam numa restauração.
 
 ## 7. Implantação
 

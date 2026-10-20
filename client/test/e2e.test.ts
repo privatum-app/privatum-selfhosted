@@ -85,6 +85,46 @@ test('state survives a restart and needs the right passphrase', opts, async () =
   }
 });
 
+test('backup restores the identity on a fresh browser and the chat resumes', opts, async () => {
+  const pass = 'alice backup passphrase';
+  const alice = await Messenger.create(pass, deps());
+  const bob = await Messenger.create('bob passphrase bkp', deps());
+  const fromAlice = () => bob.contact(alice.mailbox)?.messages.filter((m) => !m.out).map((m) => m.text) ?? [];
+  try {
+    await alice.addContact(bob.mailbox, 'Bob');
+    await alice.send(bob.mailbox, 'antes do backup');
+    assert.equal(alice.unsaved, 1);
+    const backup = await alice.exportBackup();
+    assert.equal(alice.unsaved, 0);
+    assert.ok(!backup.includes('antes do backup'), 'backup must be encrypted');
+
+    // Sent after the export: the restored copy's ratchet will be behind.
+    await alice.send(bob.mailbox, 'depois do backup');
+    await waitFor(() => fromAlice().length === 2);
+    alice.close();
+
+    await assert.rejects(Messenger.importBackup('{"format":"other"}', pass, deps()), { message: 'bad_backup' });
+    await assert.rejects(Messenger.importBackup(backup, 'senha errada!!', deps()));
+
+    const restored = await Messenger.importBackup(backup, pass, deps());
+    try {
+      assert.equal(restored.mailbox, alice.mailbox);
+      assert.deepEqual(restored.contact(bob.mailbox)!.messages.map((m) => m.text), ['antes do backup']);
+
+      await restored.send(bob.mailbox, 'voltei do backup');
+      await waitFor(() => fromAlice().length === 3);
+      assert.equal(fromAlice()[2], 'voltei do backup');
+
+      await bob.send(alice.mailbox, 'bem-vinda de volta');
+      await waitFor(() => restored.contact(bob.mailbox)!.messages.some((m) => !m.out && m.text === 'bem-vinda de volta'));
+    } finally {
+      restored.close();
+    }
+  } finally {
+    bob.close();
+  }
+});
+
 test('keys swapped by the relay are refused', opts, async () => {
   const bob = await Messenger.create('bob passphrase 789', deps());
   const mallory = await Messenger.create('mallory passphrase', deps());

@@ -6,6 +6,7 @@ import { loadOlm, storage } from './platform.ts';
 const MIN_PASSPHRASE = 12;
 
 const ERRORS: Record<string, string> = {
+  bad_backup: 'Este arquivo não é um backup do Privatum.',
   identity_mismatch: 'As chaves entregues pelo servidor NÃO correspondem ao convite. Conversa bloqueada.',
   bad_key_signature: 'A chave do contato tem assinatura inválida. Conversa bloqueada.',
   bad_invite: 'Convite inválido.',
@@ -16,6 +17,7 @@ const ERRORS: Record<string, string> = {
 };
 
 const describe = (e: unknown) => {
+  if (e instanceof TypeError) return 'Não foi possível falar com a instância. Verifique a conexão com o Tor e tente de novo.';
   const code = e instanceof Error ? e.message : String(e);
   return ERRORS[code] ?? (e instanceof KeyMismatchError ? ERRORS.identity_mismatch : `Erro: ${code}`);
 };
@@ -64,17 +66,27 @@ function Shell({ children }: { children: ReactNode }) {
 function Gate({ isNew, deps, onReady }: { isNew: boolean; deps: Deps; onReady: (m: Messenger) => void }) {
   const [pass, setPass] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [backup, setBackup] = useState<File | null>(null);
+  const [restoring, setRestoring] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const creating = isNew && !restoring;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError('');
-    if (isNew && pass.length < MIN_PASSPHRASE) return setError(`Use pelo menos ${MIN_PASSPHRASE} caracteres.`);
-    if (isNew && pass !== confirm) return setError('As senhas não coincidem.');
+    if (restoring && !backup) return setError('Escolha o arquivo de backup.');
+    if (creating && pass.length < MIN_PASSPHRASE) return setError(`Use pelo menos ${MIN_PASSPHRASE} caracteres.`);
+    if (creating && pass !== confirm) return setError('As senhas não coincidem.');
     setBusy(true);
     try {
-      onReady(isNew ? await Messenger.create(pass, deps) : await Messenger.unlock(pass, deps));
+      onReady(
+        restoring
+          ? await Messenger.importBackup(await backup!.text(), pass, deps)
+          : isNew
+            ? await Messenger.create(pass, deps)
+            : await Messenger.unlock(pass, deps),
+      );
     } catch (err) {
       setError((err as { name?: string } | null)?.name === 'OperationError' ? 'Senha incorreta.' : describe(err));
     } finally {
@@ -84,25 +96,36 @@ function Gate({ isNew, deps, onReady }: { isNew: boolean; deps: Deps; onReady: (
 
   return (
     <form className="card" onSubmit={submit}>
-      <h2>{isNew ? 'Criar identidade neste dispositivo' : 'Desbloquear'}</h2>
-      {isNew && (
+      <h2>{restoring ? 'Restaurar de um backup' : isNew ? 'Criar identidade neste dispositivo' : 'Desbloquear'}</h2>
+      {creating && (
         <p className="muted">
           A senha cifra suas chaves e conversas só neste navegador. Ela nunca é enviada ao servidor e{' '}
-          <strong>não pode ser recuperada</strong>.
+          <strong>não pode ser recuperada</strong>. O Tor Browser apaga os dados ao fechar: exporte um backup antes de sair.
         </p>
+      )}
+      {restoring && (
+        <label>
+          Arquivo de backup
+          <input type="file" accept=".privatum" onChange={(e) => setBackup(e.target.files?.[0] ?? null)} />
+        </label>
       )}
       <label>
         Senha local
         <input type="password" autoComplete={isNew ? 'new-password' : 'current-password'} value={pass} onChange={(e) => setPass(e.target.value)} autoFocus />
       </label>
-      {isNew && (
+      {creating && (
         <label>
           Confirmar senha
           <input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
         </label>
       )}
       {error && <p className="error" role="alert">{error}</p>}
-      <button disabled={busy}>{busy ? 'Derivando chave…' : isNew ? 'Criar' : 'Entrar'}</button>
+      <button disabled={busy}>{busy ? 'Derivando chave…' : restoring ? 'Restaurar' : isNew ? 'Criar' : 'Entrar'}</button>
+      {isNew && (
+        <button type="button" className="ghost" onClick={() => { setRestoring((v) => !v); setError(''); }}>
+          {restoring ? 'Criar uma identidade nova' : 'Restaurar de um backup'}
+        </button>
+      )}
     </form>
   );
 }
@@ -112,6 +135,14 @@ function Chat({ m, pendingInvite, clearInvite }: { m: Messenger; pendingInvite: 
   const [selected, setSelected] = useState<string | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   useEffect(() => m.subscribe(rerender), [m]);
+  // Tor Browser wipes site data on close: warn before leaving with unsaved messages.
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => {
+      if (m.unsaved > 0) e.preventDefault();
+    };
+    addEventListener('beforeunload', warn);
+    return () => removeEventListener('beforeunload', warn);
+  }, [m]);
 
   const contact = selected ? m.contact(selected) : undefined;
   return (
@@ -121,6 +152,7 @@ function Chat({ m, pendingInvite, clearInvite }: { m: Messenger; pendingInvite: 
           <span className="brand small">Privatum</span>
           <button className="ghost" onClick={() => setShowInvite((v) => !v)}>Meu convite</button>
         </header>
+        <BackupBar m={m} />
         {showInvite && <MyInvite mailbox={m.mailbox} />}
         <AddContact m={m} initial={pendingInvite} onAdded={(mb) => { clearInvite(); setSelected(mb); }} />
         <ul className="contacts">
@@ -137,6 +169,28 @@ function Chat({ m, pendingInvite, clearInvite }: { m: Messenger; pendingInvite: 
       <section className="conversation">
         {contact ? <Conversation m={m} mailbox={contact.mailbox} /> : <p className="muted center">Escolha ou adicione um contato.</p>}
       </section>
+    </div>
+  );
+}
+
+async function downloadBackup(m: Messenger) {
+  const url = URL.createObjectURL(new Blob([await m.exportBackup()], { type: 'application/octet-stream' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `privatum-backup-${new Date().toISOString().slice(0, 10)}.privatum`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function BackupBar({ m }: { m: Messenger }) {
+  return (
+    <div className={m.unsaved > 0 ? 'backup warn' : 'backup'}>
+      <p>
+        {m.unsaved > 0
+          ? `${m.unsaved} mensage${m.unsaved === 1 ? 'm' : 'ns'} fora do backup. O Tor Browser apaga tudo ao fechar.`
+          : 'Backup em dia.'}
+      </p>
+      <button className="ghost" onClick={() => downloadBackup(m)}>Exportar backup</button>
     </div>
   );
 }

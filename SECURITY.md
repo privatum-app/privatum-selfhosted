@@ -30,6 +30,7 @@ Este projeto **não** afirma ser "100% seguro", ter "sigilo perfeito" ou ser "an
 ## Requisitos para quem usa
 
 - **Tor Browser no nível de segurança "Padrão" (Standard).** O cliente depende de JavaScript e WebAssembly. O nível "Safest" desliga JavaScript, e os níveis "Safer" e "Safest" bloqueiam WebAssembly (Tor Browser 15). O nível "Padrão" expõe mais superfície de ataque do navegador; entenda essa troca antes de usar.
+- **Exporte o backup antes de fechar o Tor Browser.** Ele apaga os dados dos sites ao fechar; sem o arquivo de backup, a identidade e as conversas se perdem. O arquivo é protegido só pela senha local: use uma senha longa.
 - **Confira a impressão digital.** O convite traz o endereço `.onion` e a impressão digital da chave de quem convida. Receba-o por um canal em que você confia e compare o código de segurança com a outra pessoa.
 
 ## Requisitos para quem hospeda

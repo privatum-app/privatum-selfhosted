@@ -30,7 +30,7 @@ const NONCE_TTL: Duration = Duration::from_secs(60);
 const TOKEN_TTL: Duration = Duration::from_secs(15 * 60);
 const MAX_ENVELOPE: usize = 64 * 1024;
 const MAX_PENDING_PER_MAILBOX: i64 = 1000;
-const MAX_ONE_TIME_KEYS: i64 = 200;
+const MAX_ONE_TIME_KEYS: usize = 100;
 const MAX_NONCES: usize = 10_000;
 
 const CSP: &str = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; \
@@ -345,12 +345,14 @@ async fn put_keys(State(s): State<Shared>, headers: HeaderMap, Json(req): Json<P
         verify(&ed, &msg, &k.signature)?;
     }
 
-    let db = lock(&s.db);
-    let stored: i64 = db
-        .query_row("SELECT COUNT(*) FROM one_time_keys WHERE mailbox_id = ?1", [&me], |r| r.get(0))
-        .map_err(db_err)?;
-    if stored + req.one_time_keys.len() as i64 > MAX_ONE_TIME_KEYS {
+    if req.one_time_keys.len() > MAX_ONE_TIME_KEYS {
         return Err(err(StatusCode::BAD_REQUEST, "too_many_keys"));
+    }
+    let db = lock(&s.db);
+    // A new batch replaces the old one: after a restore from backup the client no
+    // longer holds the private halves of keys it published earlier.
+    if !req.one_time_keys.is_empty() {
+        db.execute("DELETE FROM one_time_keys WHERE mailbox_id = ?1", [&me]).map_err(db_err)?;
     }
     for k in &req.one_time_keys {
         db.execute(

@@ -163,6 +163,33 @@ async fn one_time_keys_are_consumed_then_fallback_remains() {
 }
 
 #[tokio::test]
+async fn new_one_time_key_batch_replaces_the_old_one() {
+    let r = router();
+    let (alice, bob) = (User::new(), User::new());
+    alice.register(&r).await;
+    bob.register(&r).await;
+    let ta = alice.login(&r).await;
+    let tb = bob.login(&r).await;
+
+    let old = json!({ "one_time_keys": [alice.signed_key("old1"), alice.signed_key("old2")] });
+    call(&r, "PUT", "/v1/keys", Some(&ta), old).await;
+    let new = json!({ "one_time_keys": [alice.signed_key("new1")] });
+    assert_eq!(call(&r, "PUT", "/v1/keys", Some(&ta), new).await.0, StatusCode::NO_CONTENT);
+
+    let uri = format!("/v1/keys/{}", alice.id);
+    let (_, first) = call(&r, "GET", &uri, Some(&tb), Value::Null).await;
+    assert_eq!(first["one_time_key"]["key_id"], "new1");
+    let (_, second) = call(&r, "GET", &uri, Some(&tb), Value::Null).await;
+    assert!(second["one_time_key"].is_null(), "old keys must be gone");
+
+    // A fallback-only update must not wipe the one-time keys.
+    call(&r, "PUT", "/v1/keys", Some(&ta), json!({ "one_time_keys": [alice.signed_key("n2")] })).await;
+    call(&r, "PUT", "/v1/keys", Some(&ta), json!({ "fallback_key": alice.signed_key("f") })).await;
+    let (_, third) = call(&r, "GET", &uri, Some(&tb), Value::Null).await;
+    assert_eq!(third["one_time_key"]["key_id"], "n2");
+}
+
+#[tokio::test]
 async fn put_keys_rejects_key_signed_by_someone_else() {
     let r = router();
     let (alice, mallory) = (User::new(), User::new());

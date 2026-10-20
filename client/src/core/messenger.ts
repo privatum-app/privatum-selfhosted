@@ -54,7 +54,14 @@ interface Saved {
   mailbox: string;
   contacts: Record<string, Contact>;
   sessions: Record<string, string[]>; // pickles, most recently used first
+  /** Contacts whose sessions came from a backup: start a fresh session before sending. */
+  resync?: string[];
+  /** Messages sent or received since the last backup export. */
+  unsaved?: number;
 }
+
+const BACKUP_FORMAT = 'privatum-backup';
+const saltBytes = (salt: string) => Uint8Array.from(atob(salt), (c) => c.charCodeAt(0));
 
 interface Envelope {
   v: 1;
@@ -140,12 +147,53 @@ export class Messenger {
   static async unlock(passphrase: string, deps: Deps): Promise<Messenger> {
     const [salt, sealed] = [await deps.storage.get('salt'), await deps.storage.get('state')];
     if (!salt || !sealed) throw new Error('no_identity');
-    const keys = await deriveKeys(passphrase, Uint8Array.from(atob(salt), (c) => c.charCodeAt(0)));
+    const keys = await deriveKeys(passphrase, saltBytes(salt));
     const state = await open<Saved>(keys.aesKey, sealed);
     const account = deps.olm.Account.fromPickle(state.account, keys.pickleKey);
     const m = new Messenger(deps, keys, account, state);
     await m.connect();
     return m;
+  }
+
+  /**
+   * Restores an identity from an exported backup. Throws `bad_backup` for a
+   * malformed file and an OperationError for a wrong passphrase.
+   */
+  static async importBackup(text: string, passphrase: string, deps: Deps): Promise<Messenger> {
+    let file: { format?: unknown; v?: unknown; salt?: unknown; state?: unknown };
+    try {
+      file = JSON.parse(text);
+    } catch {
+      throw new Error('bad_backup');
+    }
+    if (file.format !== BACKUP_FORMAT || file.v !== 1 || typeof file.salt !== 'string' || typeof file.state !== 'string') {
+      throw new Error('bad_backup');
+    }
+    const keys = await deriveKeys(passphrase, saltBytes(file.salt));
+    const state = await open<Saved>(keys.aesKey, file.state);
+    // Never encrypt with restored sessions: if the backup is older than the live
+    // ratchet, encrypting would reuse message keys. They stay usable for decrypting.
+    state.resync = Object.keys(state.contacts);
+    state.unsaved = 0;
+    const account = deps.olm.Account.fromPickle(state.account, keys.pickleKey);
+    const m = new Messenger(deps, keys, account, state);
+    await deps.storage.set('salt', file.salt);
+    await m.save();
+    await m.connect();
+    return m;
+  }
+
+  /** The sealed state plus its salt; protected only by the local passphrase. */
+  async exportBackup(): Promise<string> {
+    this.state.unsaved = 0;
+    await this.save();
+    this.changed();
+    const [salt, state] = [await this.deps.storage.get('salt'), await this.deps.storage.get('state')];
+    return JSON.stringify({ format: BACKUP_FORMAT, v: 1, salt, state });
+  }
+
+  get unsaved(): number {
+    return this.state.unsaved ?? 0;
   }
 
   get mailbox() {
@@ -199,12 +247,8 @@ export class Messenger {
     });
     const otks = Object.entries(JSON.parse(this.account.oneTimeKeys()) as Record<string, string>).map(([i, k]) => sign(i, k));
     const fb = Object.entries(JSON.parse(this.account.fallbackKey()) as Record<string, string>).map(([i, k]) => sign(i, k));
-    try {
-      await this.relay.putKeys(otks, fb[0] ?? null);
-    } catch (e) {
-      // shortcut: the relay caps stored keys; when full we simply skip this batch (the fallback key still works).
-      if (!(e instanceof Error) || e.message !== 'too_many_keys') throw e;
-    }
+    // The relay replaces our previous batch, so it never hands out keys we no longer hold.
+    await this.relay.putKeys(otks, fb[0] ?? null);
     this.account.markKeysAsPublished();
     await this.save();
   }
@@ -267,15 +311,18 @@ export class Messenger {
     const c = this.state.contacts[mailbox];
     const body = text.trim();
     if (!c || !body || body.length > MAX_TEXT) throw new Error('bad_message');
-    let list = this.sessions.get(mailbox) ?? [];
-    if (list.length === 0) {
-      list = [(await this.startSession(mailbox)).session];
+    const list = this.sessions.get(mailbox) ?? [];
+    const resync = this.state.resync ?? [];
+    if (list.length === 0 || resync.includes(mailbox)) {
+      list.unshift((await this.startSession(mailbox)).session);
       this.sessions.set(mailbox, list);
+      this.state.resync = resync.filter((m) => m !== mailbox);
     }
     const at = Date.now();
     const enc = list[0].encrypt(pad({ k: 'text', b: body, t: at }));
     const msg: Message = { out: true, text: body, at };
     c.messages.push(msg);
+    this.state.unsaved = this.unsaved + 1;
     await this.save(); // persist the advanced ratchet before the message leaves
     this.changed();
     const env: Envelope = {
@@ -310,6 +357,7 @@ export class Messenger {
         const parsed = JSON.parse(fromUtf8(plain)) as { k?: string; b?: unknown };
         if (parsed.k === 'text' && typeof parsed.b === 'string') {
           c.messages.push({ out: false, text: parsed.b.slice(0, MAX_TEXT), at: Date.now() });
+          this.state.unsaved = this.unsaved + 1;
         }
       } catch {
         // authenticated but malformed: drop it
