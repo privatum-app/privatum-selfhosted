@@ -1,0 +1,4 @@
+# Keep LF everywhere: these files run inside Linux containers, and Git for
+# Windows would otherwise check them out with CRLF (breaking tor-entrypoint.sh).
+* text=auto eol=lf
+*.wasm binary
