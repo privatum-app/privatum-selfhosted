@@ -58,6 +58,8 @@ interface Saved {
   resync?: string[];
   /** Messages sent or received since the last backup export. */
   unsaved?: number;
+  /** Mailboxes whose messages are dropped unread. */
+  blocked?: string[];
 }
 
 const BACKUP_FORMAT = 'privatum-backup';
@@ -294,8 +296,27 @@ export class Messenger {
     return { session: this.account.createOutboundSession(k.curve25519, otk.key), ed25519: k.ed25519, curve25519: k.curve25519 };
   }
 
+  /**
+   * Forgets the contact and its history on this device. The sessions are kept,
+   * so if the person writes again the conversation reappears (as unverified).
+   */
+  async deleteContact(mailbox: string): Promise<void> {
+    delete this.state.contacts[mailbox];
+    await this.save();
+    this.changed();
+  }
+
+  /** Deletes the contact and its sessions and drops anything it sends from now on. Adding its invite again unblocks. */
+  async blockContact(mailbox: string): Promise<void> {
+    this.state.blocked = [...new Set([...(this.state.blocked ?? []), mailbox])];
+    this.sessions.delete(mailbox);
+    this.state.resync = (this.state.resync ?? []).filter((m) => m !== mailbox);
+    await this.deleteContact(mailbox);
+  }
+
   async addContact(mailbox: string, name: string): Promise<Contact> {
     if (!isMailboxId(mailbox) || mailbox === this.mailbox) throw new Error('bad_invite');
+    this.state.blocked = (this.state.blocked ?? []).filter((m) => m !== mailbox);
     const existing = this.state.contacts[mailbox];
     if (existing) return existing;
     const { session, ed25519, curve25519 } = await this.startSession(mailbox);
@@ -350,7 +371,8 @@ export class Messenger {
   }
 
   private async receive(d: Delivered) {
-    const plain = await this.decryptDelivered(d).catch(() => null);
+    // Blocked senders are not even decrypted, so they can't open a new session either.
+    const plain = this.state.blocked?.includes(d.from) ? null : await this.decryptDelivered(d).catch(() => null);
     const c = this.state.contacts[d.from];
     if (plain && c) {
       try {
@@ -381,6 +403,7 @@ export class Messenger {
       try {
         const plain = list[i].decrypt(env.type, env.ciphertext);
         list.unshift(...list.splice(i, 1));
+        this.ensureContact(d.from, env);
         return plain;
       } catch {
         // try the next session
@@ -390,17 +413,20 @@ export class Messenger {
     const inbound = this.account.createInboundSession(env.from_curve25519, env.ciphertext);
     list.unshift(inbound.takeSession());
     this.sessions.set(d.from, list);
-    if (!this.state.contacts[d.from]) {
-      this.state.contacts[d.from] = {
-        mailbox: d.from,
-        ed25519: env.from_ed25519,
-        curve25519: env.from_curve25519,
-        name: `Contato ${d.from.slice(0, 6)}`,
-        addedByMe: false,
-        verified: false,
-        messages: [],
-      };
-    }
+    this.ensureContact(d.from, env);
     return inbound.plaintext;
+  }
+
+  /** A sender we have no contact for (new, or deleted earlier) shows up as unverified. */
+  private ensureContact(mailbox: string, env: Envelope) {
+    this.state.contacts[mailbox] ??= {
+      mailbox,
+      ed25519: env.from_ed25519,
+      curve25519: env.from_curve25519,
+      name: `Contato ${mailbox.slice(0, 6)}`,
+      addedByMe: false,
+      verified: false,
+      messages: [],
+    };
   }
 }

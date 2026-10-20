@@ -88,6 +88,14 @@ A instância só fica disponível enquanto o computador estiver ligado e os cont
 
 O backup é cifrado com a sua senha local; quem tiver o arquivo pode tentar adivinhá-la offline, então use uma senha longa e guarde o arquivo em local seguro. Restaurar um backup antigo perde as mensagens trocadas depois dele.
 
+### Sair, apagar e bloquear
+
+- **Sair:** tranca a identidade e volta à tela de senha; as chaves deixam a memória da página. Para apagar tudo deste computador, feche o Tor Browser (ele apaga os dados dos sites), depois de exportar o backup se quiser continuar depois.
+- **Apagar conversa:** remove o contato e o histórico só deste aparelho. Se a pessoa escrever de novo, a conversa reaparece como "não verificada", sem o histórico antigo.
+- **Bloquear:** apaga a conversa e descarta, sem ler, tudo o que essa pessoa enviar. Para desbloquear, adicione o convite dela de novo. O bloqueio é local: a instância continua aceitando as mensagens dela e o seu aparelho as descarta.
+
+Não existe "sala" com prazo: a instância fica no ar enquanto quem hospeda mantiver os contêineres rodando, e cada pessoa decide o que guarda no próprio aparelho.
+
 Cada convite abre uma conversa **individual** entre você e quem o usar; não há conversas em grupo.
 
 Celulares: o Tor Browser para Android deve funcionar, mas **não foi testado**. No iOS não há Tor Browser oficial.

@@ -125,6 +125,42 @@ test('backup restores the identity on a fresh browser and the chat resumes', opt
   }
 });
 
+test('blocking drops a contact and its messages; adding the invite again unblocks', opts, async () => {
+  const alice = await Messenger.create('alice passphrase blk', deps());
+  const bob = await Messenger.create('bob passphrase blk', deps());
+  const incoming = () => bob.contact(alice.mailbox)?.messages.filter((m) => !m.out).map((m) => m.text) ?? [];
+  try {
+    await alice.addContact(bob.mailbox, 'Bob');
+    await alice.send(bob.mailbox, 'primeira');
+    await waitFor(() => incoming().length === 1);
+
+    await bob.blockContact(alice.mailbox);
+    assert.equal(bob.contact(alice.mailbox), undefined);
+    await alice.send(bob.mailbox, 'enquanto bloqueada');
+    await new Promise((r) => setTimeout(r, 500));
+    await bob.idle();
+    assert.equal(bob.contact(alice.mailbox), undefined, 'blocked sender must not reappear');
+
+    await bob.addContact(alice.mailbox, 'Alice');
+    await bob.send(alice.mailbox, 'desbloqueei');
+    await waitFor(() => alice.contact(bob.mailbox)!.messages.some((m) => !m.out && m.text === 'desbloqueei'));
+    await alice.send(bob.mailbox, 'de novo');
+    await waitFor(() => incoming().includes('de novo'));
+    assert.ok(!incoming().includes('enquanto bloqueada'));
+
+    // Deleting is not blocking: a new message brings the conversation back, unverified.
+    await alice.deleteContact(bob.mailbox);
+    assert.equal(alice.contacts.length, 0);
+    await bob.send(alice.mailbox, 'depois de apagar');
+    await waitFor(() => alice.contact(bob.mailbox)?.messages.some((m) => m.text === 'depois de apagar') === true);
+    assert.equal(alice.contact(bob.mailbox)!.addedByMe, false);
+    assert.equal(alice.contact(bob.mailbox)!.messages.length, 1, 'old history stays deleted');
+  } finally {
+    alice.close();
+    bob.close();
+  }
+});
+
 test('keys swapped by the relay are refused', opts, async () => {
   const bob = await Messenger.create('bob passphrase 789', deps());
   const mallory = await Messenger.create('mallory passphrase', deps());

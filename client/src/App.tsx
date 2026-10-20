@@ -51,7 +51,12 @@ export function App() {
       </Shell>
     );
   }
-  return <Chat m={messenger} pendingInvite={pendingInvite} clearInvite={() => setPendingInvite(null)} />;
+  const lock = () => {
+    messenger.close();
+    setMessenger(null);
+    setHasIdentity(true);
+  };
+  return <Chat m={messenger} pendingInvite={pendingInvite} clearInvite={() => setPendingInvite(null)} onLock={lock} />;
 }
 
 function Shell({ children }: { children: ReactNode }) {
@@ -130,7 +135,7 @@ function Gate({ isNew, deps, onReady }: { isNew: boolean; deps: Deps; onReady: (
   );
 }
 
-function Chat({ m, pendingInvite, clearInvite }: { m: Messenger; pendingInvite: string | null; clearInvite: () => void }) {
+function Chat({ m, pendingInvite, clearInvite, onLock }: { m: Messenger; pendingInvite: string | null; clearInvite: () => void; onLock: () => void }) {
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const [selected, setSelected] = useState<string | null>(null);
   const [showInvite, setShowInvite] = useState(false);
@@ -150,7 +155,17 @@ function Chat({ m, pendingInvite, clearInvite }: { m: Messenger; pendingInvite: 
       <aside className="sidebar">
         <header className="sidebar-head">
           <span className="brand small">Privatum</span>
-          <button className="ghost" onClick={() => setShowInvite((v) => !v)}>Meu convite</button>
+          <div className="actions">
+            <button className="ghost" onClick={() => setShowInvite((v) => !v)}>Meu convite</button>
+            <button
+              className="ghost"
+              onClick={() => {
+                if (m.unsaved === 0 || confirm(`${m.unsaved} mensagem(ns) ainda fora do backup. Sair mesmo assim?`)) onLock();
+              }}
+            >
+              Sair
+            </button>
+          </div>
         </header>
         <BackupBar m={m} />
         {showInvite && <MyInvite mailbox={m.mailbox} />}
@@ -167,7 +182,7 @@ function Chat({ m, pendingInvite, clearInvite }: { m: Messenger; pendingInvite: 
         </ul>
       </aside>
       <section className="conversation">
-        {contact ? <Conversation m={m} mailbox={contact.mailbox} /> : <p className="muted center">Escolha ou adicione um contato.</p>}
+        {contact ? <Conversation m={m} mailbox={contact.mailbox} onGone={() => setSelected(null)} /> : <p className="muted center">Escolha ou adicione um contato.</p>}
       </section>
     </div>
   );
@@ -240,7 +255,7 @@ function AddContact({ m, initial, onAdded }: { m: Messenger; initial: string | n
   );
 }
 
-function Conversation({ m, mailbox }: { m: Messenger; mailbox: string }) {
+function Conversation({ m, mailbox, onGone }: { m: Messenger; mailbox: string; onGone: () => void }) {
   const c = m.contact(mailbox)!;
   const [text, setText] = useState('');
   const [error, setError] = useState('');
@@ -272,7 +287,31 @@ function Conversation({ m, mailbox }: { m: Messenger; mailbox: string }) {
   return (
     <>
       <header className="conv-head">
-        <h2>{c.name}</h2>
+        <div className="conv-title">
+          <h2>{c.name}</h2>
+          <div className="actions">
+            <button
+              className="ghost small"
+              onClick={async () => {
+                if (!confirm(`Apagar a conversa com ${c.name} deste dispositivo? O histórico não poderá ser recuperado.`)) return;
+                onGone();
+                await m.deleteContact(mailbox);
+              }}
+            >
+              Apagar conversa
+            </button>
+            <button
+              className="ghost small danger"
+              onClick={async () => {
+                if (!confirm(`Bloquear ${c.name}? A conversa será apagada e novas mensagens dessa pessoa serão descartadas. Para desbloquear, adicione o convite dela de novo.`)) return;
+                onGone();
+                await m.blockContact(mailbox);
+              }}
+            >
+              Bloquear
+            </button>
+          </div>
+        </div>
         <details>
           <summary>Código de segurança</summary>
           <p className="muted">Compare com o contato por voz ou pessoalmente. Se for igual nos dois aparelhos, marque como verificado.</p>
