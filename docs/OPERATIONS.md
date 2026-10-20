@@ -11,7 +11,7 @@ Requisito: Docker com Compose. Nada mais precisa ser instalado; Rust e Tor são 
 ```bash
 cd deploy
 docker compose up -d
-docker compose logs tor | grep "onion service"
+docker compose exec tor cat /run/onion/hostname
 ```
 
 A última linha mostra o endereço `.onion` da instância. Na primeira vez, publicar o serviço pode levar alguns minutos.

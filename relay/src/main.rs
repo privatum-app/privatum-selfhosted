@@ -30,8 +30,9 @@ async fn resolve_host() -> String {
 
 #[tokio::main]
 async fn main() {
+    let cfg_host = resolve_host().await;
     let cfg = Config {
-        host: resolve_host().await,
+        host: cfg_host.clone(),
         db_path: env::var("PRIVATUM_DB").unwrap_or_else(|_| "/data/relay.sqlite".into()),
         message_ttl_days: env_or("PRIVATUM_MESSAGE_TTL_DAYS", 14),
         max_mailboxes: env_or("PRIVATUM_MAX_MAILBOXES", 10_000),
@@ -59,6 +60,12 @@ async fn main() {
     });
     // No request logging on purpose: the relay keeps no access logs (THREAT-MODEL L3).
     eprintln!("privatum-relay listening on {listen}");
+    // Also shown in Docker Desktop (container relay-1 > Logs), so the address is easy to find.
+    eprintln!("==================================================");
+    eprintln!(" Seu Privatum está no ar:");
+    eprintln!(" http://{}", cfg_host);
+    eprintln!(" Abra este endereço no Tor Browser (nível Standard).");
+    eprintln!("==================================================");
     axum::serve(listener, router)
         .with_graceful_shutdown(async {
             // docker stop sends SIGTERM; Ctrl-C sends SIGINT.

@@ -15,7 +15,12 @@ cp /var/lib/tor/hs/hostname /run/onion/hostname.tmp
 # tor writes it 0600; the relay runs as another user and only needs to read it.
 chmod 0644 /run/onion/hostname.tmp
 mv /run/onion/hostname.tmp /run/onion/hostname
-echo "onion service: $(cat /run/onion/hostname)"
+# Shown in "docker compose logs" and in Docker Desktop (container tor-1 > Logs).
+echo "=================================================="
+echo " Seu Privatum está no ar:"
+echo " http://$(cat /run/onion/hostname)"
+echo " Abra este endereço no Tor Browser (nível Standard)."
+echo "=================================================="
 
 # wait returns early when a signal arrives; keep waiting until tor has exited.
 while kill -0 "$pid" 2>/dev/null; do

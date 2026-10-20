@@ -1,6 +1,6 @@
 # Privatum self-hosted instance: relay + Tor onion service.
 #   cd deploy && docker compose up -d
-#   docker compose logs tor | grep "onion service"   # your .onion address
+#   docker compose exec tor cat /run/onion/hostname   # your .onion address (also in the tor/relay logs)
 # Nothing is published on the host: the only way in is the onion address.
 
 name: privatum
