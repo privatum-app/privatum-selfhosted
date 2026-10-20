@@ -2,10 +2,9 @@ import { useEffect, useReducer, useRef, useState, type FormEvent, type ReactNode
 import { inviteLink, parseInvite, safetyCode } from './core/identity.ts';
 import { KeyMismatchError, Messenger, type Contact, type Deps } from './core/messenger.ts';
 import { loadOlm, storage } from './platform.ts';
-import { Icon, Modal, Sigil } from './ui.tsx';
+import { Icon, Logo, Modal, Sigil } from './ui.tsx';
 
 const MIN_PASSPHRASE = 12;
-const BRAND_SEED = 'privatumonionsigilbrandmark';
 
 const ERRORS: Record<string, string> = {
   bad_backup: 'Este arquivo não é um backup do Privatum.',
@@ -67,8 +66,10 @@ function Welcome({ children }: { children: ReactNode }) {
   return (
     <main className="welcome">
       <div className="welcome-mark">
-        <Sigil seed={BRAND_SEED} size={88} brand />
-        <h1 className="wordmark">Privatum</h1>
+        <h1 className="brandmark">
+          <Logo size={96} />
+          <span className="wordmark">Privatum</span>
+        </h1>
         <p className="tagline">Conversas cifradas no seu navegador. A instância só guarda o que não consegue ler.</p>
       </div>
       {children}
@@ -194,7 +195,7 @@ function Chat({ m, pendingInvite, clearInvite, onLock }: { m: Messenger; pending
       <aside className="sidebar">
         <header className="side-head">
           <div className="me">
-            <Sigil seed={m.mailbox} size={36} />
+            <Logo size={28} />
             <span className="me-name">Privatum</span>
           </div>
           <div className="toolbar">

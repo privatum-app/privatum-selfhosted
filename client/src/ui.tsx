@@ -7,7 +7,7 @@ const B32 = 'abcdefghijklmnopqrstuvwxyz234567';
  * sigil on every device; it echoes the self-certifying address visually.
  * Decorative only: identity is verified by the safety code, not by this.
  */
-export function Sigil({ seed, size = 40, brand = false }: { seed: string; size?: number; brand?: boolean }) {
+export function Sigil({ seed, size = 40 }: { seed: string; size?: number }) {
   const v = [...seed.padEnd(12, 'a').slice(0, 12)].map((c) => Math.max(0, B32.indexOf(c)));
   // Stay inside the brand's green family; rings differ by shade and dash pattern.
   const shade = (i: number) => (v[i] * 32 + v[i + 1]) / 1024;
@@ -19,7 +19,7 @@ export function Sigil({ seed, size = 40, brand = false }: { seed: string; size?:
   };
   const rings = [ring(19, 0), ring(12.5, 2)];
   return (
-    <svg className={brand ? 'sigil brand' : 'sigil'} width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+    <svg className="sigil" width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
       <circle cx="24" cy="24" r="23.5" className="sigil-bg" />
       {rings.map((g, i) => (
         <circle
@@ -36,6 +36,18 @@ export function Sigil({ seed, size = 40, brand = false }: { seed: string; size?:
         />
       ))}
       <circle cx="24" cy="24" r="5.5" className="sigil-core" fill={color(4, 70)} />
+    </svg>
+  );
+}
+
+/** The Privatum key mark (vector redraw of the brand logo). */
+export function Logo({ size = 32 }: { size?: number }) {
+  return (
+    <svg className="logo" width={(size * 446) / 676} height={size} viewBox="-40 -10 446 676" aria-hidden="true">
+      <path fillRule="evenodd" d="M183 0a183 183 0 1 1 0 366A183 183 0 1 1 183 0zm0 71a112 112 0 1 0 0 224A112 112 0 1 0 183 71z" />
+      <rect x="131" y="296" width="80" height="357" rx="20" />
+      <rect x="180" y="425" width="118" height="75" rx="20" />
+      <rect x="180" y="550" width="118" height="103" rx="20" />
     </svg>
   );
 }

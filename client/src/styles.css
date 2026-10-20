@@ -1,4 +1,4 @@
-/* Privatum — the original brand palette (black, green, white), one typeface, onion sigils as the only ornament. */
+/* Privatum — the original brand: black, green and white, Inter for text, JetBrains Mono for technical strings, the key mark. */
 :root {
   --ink: #0b0f0d;
   --panel: #111714;
@@ -15,7 +15,8 @@
   --r-panel: 18px;
   --r-control: 12px;
   color-scheme: dark;
-  font-family: 'Instrument Sans Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'JetBrains Mono Variable', ui-monospace, Consolas, monospace;
   font-size: 15px;
   line-height: 1.5;
 }
@@ -72,19 +73,22 @@ h1, h2, p { margin: 0; }
 
 /* Welcome / gate */
 .welcome { min-height: 100dvh; display: grid; align-content: center; justify-items: center; gap: 2rem; padding: 48px 16px; }
-.welcome-mark { display: grid; justify-items: center; gap: 0.75rem; text-align: center; max-width: 30rem; }
-.wordmark { font-size: 2.75rem; font-weight: 640; letter-spacing: -0.035em; line-height: 1.05; }
+.welcome-mark { display: grid; justify-items: center; gap: 1rem; text-align: center; max-width: 30rem; }
+.logo { flex: none; display: block; fill: var(--accent); }
+.brandmark { display: flex; align-items: center; gap: 0.9rem; }
+.brandmark .logo { filter: drop-shadow(0 0 18px rgb(52 211 153 / 0.45)); }
+.wordmark { font-size: 4rem; font-weight: 800; letter-spacing: -0.05em; line-height: 1; color: #f2f7f4; }
 .tagline { color: var(--muted); max-width: 26rem; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-panel); }
 .gate { width: min(100%, 400px); padding: 1.5rem; display: grid; gap: 1rem; }
-.gate h2 { font-size: 1.15rem; font-weight: 620; }
+.gate h2 { font-size: 1.15rem; font-weight: 700; }
 
 /* App shell */
 .app { display: grid; grid-template-columns: 340px 1fr; height: 100dvh; }
 .sidebar { display: flex; flex-direction: column; gap: 0.75rem; min-height: 0; padding: 0.75rem; background: var(--panel); border-right: 1px solid var(--line); }
 .side-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.25rem 0.25rem 0.5rem; }
 .me { display: flex; align-items: center; gap: 0.6rem; }
-.me-name { font-weight: 640; font-size: 1.05rem; letter-spacing: -0.015em; }
+.me-name { font-weight: 800; font-size: 1.15rem; letter-spacing: -0.04em; }
 .toolbar { display: flex; gap: 0.15rem; }
 .new-chat { width: 100%; }
 .side-empty { padding: 0.5rem; font-size: 0.9rem; }
@@ -116,7 +120,7 @@ h1, h2, p { margin: 0; }
 .conv-head { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--line); }
 .conv-head .back { display: none; }
 .conv-title { flex: 1; min-width: 0; display: grid; gap: 0.1rem; justify-items: start; }
-.conv-title h2 { font-size: 1.1rem; font-weight: 620; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.conv-title h2 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .trust { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0; border: 0; background: none; cursor: pointer; font-size: 0.82rem; font-weight: 500; }
 .trust .icon-svg { width: 16px; height: 16px; }
 .trust.ok { color: var(--ok); }
@@ -161,13 +165,13 @@ h1, h2, p { margin: 0; }
 @keyframes modal-in { from { opacity: 0; transform: translateY(6px) scale(0.98); } }
 .modal-body { display: grid; gap: 1rem; padding: 1.25rem; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.modal-head h2 { font-size: 1.15rem; font-weight: 620; }
+.modal-head h2 { font-size: 1.15rem; font-weight: 700; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; flex-wrap: wrap; }
-.invite-link { display: block; padding: 0.75rem; border-radius: var(--r-control); background: var(--ink); color: var(--accent); font-size: 0.85rem; word-break: break-all; }
+.invite-link { display: block; padding: 0.75rem; border-radius: var(--r-control); background: var(--ink); color: var(--accent); font-family: var(--mono); font-size: 0.8rem; word-break: break-all; }
 
 .seal { display: flex; justify-content: center; }
 .seal .sigil + .sigil { margin-left: -10px; }
-.code { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem 1rem; padding: 1rem; border-radius: var(--r-control); background: var(--ink); text-align: center; font-size: 1.45rem; font-weight: 560; letter-spacing: 0.06em; font-variant-numeric: tabular-nums; }
+.code { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem 1rem; padding: 1rem; border-radius: var(--r-control); background: var(--ink); text-align: center; font-family: var(--mono); font-size: 1.35rem; font-weight: 500; letter-spacing: 0.04em; color: var(--accent); }
 .check { display: flex; gap: 0.6rem; align-items: center; cursor: pointer; }
 .check input { width: 20px; height: 20px; accent-color: var(--accent); }
 
@@ -179,15 +183,10 @@ h1, h2, p { margin: 0; }
   .conv-head { padding: 0.5rem 0.75rem; }
   .conv-head .back { display: inline-grid; }
   .bubble { max-width: 85%; }
-  .wordmark { font-size: 2.25rem; }
+  .wordmark { font-size: 2.75rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .modal[open] { animation: none; }
   .btn { transition: none; }
 }
-
-/* The brand mark uses the palette instead of hash-derived hues. */
-.sigil.brand circle[stroke] { stroke: var(--accent); }
-.sigil.brand circle[stroke] + circle[stroke] { stroke: #a7f3d0; }
-.sigil.brand .sigil-core { fill: var(--accent); }
