@@ -46,6 +46,34 @@ Depois cifre `onion-key.tar` (por exemplo com `age` ou `gpg --symmetric`) e apag
 
 Para restaurar, com a instância parada: decifre o arquivo, extraia em `hs/` dentro do volume e mantenha dono `debian-tor` e permissão `0700` no diretório.
 
+## Trocar o endereço `.onion`
+
+O endereço não é escolhido nem registrado em lugar nenhum: o Tor o calcula a partir da chave privada em `privatum_tor-state` (`hs/hs_ed25519_secret_key`). Mesma chave, mesmo endereço, para sempre; chave nova, endereço novo.
+
+Para trocar, dentro de `deploy/`:
+
+```bash
+docker compose down
+```
+
+```bash
+docker run --rm -v privatum_tor-state:/s debian:bookworm-slim rm -rf /s/hs
+```
+
+```bash
+docker compose up -d
+```
+
+O novo endereço aparece no link `info-1` do Docker Desktop, nos logs e em `docker compose exec tor cat /run/onion/hostname`.
+
+Depois da troca:
+
+- **Convites antigos param de funcionar**: eles apontam para o endereço velho. Envie o novo endereço por um canal confiável.
+- **Cada pessoa restaura o próprio backup no endereço novo.** Para o navegador, o endereço novo é outro site, então a identidade não aparece lá até ser restaurada com o arquivo `.privatum` e a senha local.
+- **Contatos e mensagens pendentes continuam valendo**, porque o banco do relay (`privatum_relay-data`) não muda. Quem já conversava não precisa trocar convites de novo.
+
+Quando faz sentido trocar: se a chave vazou (quem a tem pode se passar pela sua instância) ou para cortar o vínculo com um endereço que circulou demais. Para voltar a um endereço antigo, só restaurando o backup da pasta `hs` (seção anterior); sem ele, o endereço antigo está perdido.
+
 ## Atualizar
 
 As imagens base e a versão do Tor são fixadas. Quando o Tor Project publica uma versão nova, o build do contêiner `tor` passa a falhar de propósito. Leia as notas da versão, ajuste `TOR_VERSION` em `deploy/tor.Dockerfile` e rode `docker compose build && docker compose up -d`.

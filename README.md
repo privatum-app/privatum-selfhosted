@@ -85,6 +85,7 @@ Não existe acesso por `localhost` nem por IP: a instância só responde pelo en
 | Parar (mantém dados e endereço) | `docker compose down` |
 | Subir de novo | `docker compose up -d` |
 | Atualizar | `git pull` e depois `docker compose up -d --build` |
+| Trocar o endereço `.onion` | veja [Trocar o endereço .onion](docs/OPERATIONS.md#trocar-o-endereço-onion) |
 | **Apagar tudo**, inclusive o endereço `.onion` e mensagens pendentes | `docker compose down -v` |
 
 A instância só fica disponível enquanto o computador estiver ligado e os contêineres rodando. Mensagens enviadas a quem está offline ficam guardadas cifradas por até 14 dias.
