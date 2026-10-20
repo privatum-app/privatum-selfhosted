@@ -1,0 +1,62 @@
+# Privatum self-hosted instance: relay + Tor onion service.
+#   cd deploy && docker compose up -d
+#   docker compose logs tor | grep "onion service"   # your .onion address
+# Nothing is published on the host: the only way in is the onion address.
+
+name: privatum
+
+services:
+  relay:
+    build:
+      context: ..
+      dockerfile: deploy/relay.Dockerfile
+    image: privatum-relay:local
+    restart: unless-stopped
+    # tor must create the shared volume first so it keeps tor's ownership.
+    depends_on: [tor]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      PRIVATUM_HOST_FILE: /run/onion/hostname
+      PRIVATUM_DB: /data/relay.sqlite
+      PRIVATUM_MESSAGE_TTL_DAYS: "14"
+      PRIVATUM_MAX_MAILBOXES: "10000"
+    volumes:
+      - relay-data:/data
+      - onion-hostname:/run/onion:ro
+    networks:
+      internal:
+        ipv4_address: 172.30.0.10
+
+  tor:
+    build:
+      context: .
+      dockerfile: tor.Dockerfile
+    image: privatum-tor:local
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: [/tmp]
+    volumes:
+      - tor-state:/var/lib/tor
+      - onion-hostname:/run/onion
+    networks:
+      - internal
+      - egress
+
+networks:
+  # The relay has no route to the internet; only tor can reach it.
+  internal:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+  egress: {}
+
+volumes:
+  relay-data:
+  # Contains the onion service private key. See docs/OPERATIONS.md for backup.
+  tor-state:
+  onion-hostname:

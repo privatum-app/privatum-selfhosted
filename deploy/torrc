@@ -1,0 +1,9 @@
+# Onion service only: no SOCKS proxy, no relay, no exit.
+SocksPort 0
+DataDirectory /var/lib/tor/data
+Log notice stdout
+
+# The private key (hs_ed25519_secret_key) lives here. Back it up; never share it.
+HiddenServiceDir /var/lib/tor/hs
+# Tor needs an IP target, not a hostname: the relay's fixed address on the internal network.
+HiddenServicePort 80 172.30.0.10:8080

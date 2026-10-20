@@ -1,0 +1,9 @@
+# Allowlist: the instance image only needs these three projects.
+*
+!relay/
+!crypto-wasm/
+!client/
+**/target/
+**/node_modules/
+**/dist/
+crypto-wasm/pkg/

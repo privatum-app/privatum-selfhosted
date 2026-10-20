@@ -1,0 +1,13 @@
+.DS_Store
+*.log
+node_modules/
+dist/
+target/
+
+# Secrets and local data never go in the repo.
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-*
+onion-key.tar*
