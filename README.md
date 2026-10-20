@@ -66,6 +66,16 @@ Procure a linha `onion service: ....onion`. Na primeira vez o Tor pode levar um 
 
 **Esse endereço identifica a sua instância.** A chave que o gera fica no volume `privatum_tor-state`; faça backup dela (veja [docs/OPERATIONS.md](docs/OPERATIONS.md)). Se você a perder, o endereço muda e todos os convites deixam de funcionar.
 
+### 4. Acesse pelo Tor Browser
+
+Pronto: não há outro programa para abrir. Daqui em diante **todo mundo, inclusive quem hospeda, entra pelo Tor Browser**:
+
+1. Abra o Tor Browser (no nível **Standard**) e cole o endereço `.onion` na barra de endereço.
+2. Na primeira visita depois de abrir o Tor Browser, a página pode demorar ou dar "a conexão expirou": o Tor ainda está montando o caminho até o serviço. Clique em **Tentar novamente**; das próximas vezes é rápido.
+3. Crie sua identidade e envie o seu convite (ícone de link) a quem quiser. Quem recebe só precisa do Tor Browser: **não instala Docker nem o Privatum**.
+
+Não existe acesso por `localhost` nem por IP: a instância só responde pelo endereço `.onion`, e é a esse endereço que as assinaturas de login ficam presas.
+
 ### Parar, reiniciar, atualizar, apagar
 
 | Ação | Comando (dentro de `deploy/`) |
@@ -90,7 +100,8 @@ O backup é cifrado com a sua senha local; quem tiver o arquivo pode tentar adiv
 
 ### Sair, apagar e bloquear
 
-- **Sair:** tranca a identidade e volta à tela de senha; as chaves deixam a memória da página. Para apagar tudo deste computador, feche o Tor Browser (ele apaga os dados dos sites), depois de exportar o backup se quiser continuar depois.
+- **Trancar** (cadeado): volta à tela de senha; as chaves deixam a memória da página, mas a identidade continua neste navegador até ele ser fechado.
+- **Sair** (porta): apaga a identidade, os contatos e as conversas deste navegador. O aviso oferece exportar o backup antes; sem ele, não há como voltar. Fechar o Tor Browser tem o mesmo efeito.
 - **Apagar conversa:** remove o contato e o histórico só deste aparelho. Se a pessoa escrever de novo, a conversa reaparece como "não verificada", sem o histórico antigo.
 - **Bloquear:** apaga a conversa e descarta, sem ler, tudo o que essa pessoa enviar. Para desbloquear, adicione o convite dela de novo. O bloqueio é local: a instância continua aceitando as mensagens dela e o seu aparelho as descarta.
 

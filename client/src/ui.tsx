@@ -56,6 +56,7 @@ const PATHS: Record<string, string> = {
   link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
   download: 'M12 4v11m0 0-4-4m4 4 4-4M5 19h14',
   lock: 'M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z',
+  logout: 'M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10',
   plus: 'M12 5v14M5 12h14',
   send: 'M5 12h12M12 6l6 6-6 6',
   back: 'M15 6l-6 6 6 6',

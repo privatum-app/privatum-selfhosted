@@ -33,4 +33,5 @@ function request<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBReq
 export const storage: Storage = {
   get: (key) => request<string | undefined>('readonly', (s) => s.get(key)),
   set: (key, value) => request<void>('readwrite', (s) => s.put(value, key)),
+  clear: () => request<void>('readwrite', (s) => s.clear()),
 };

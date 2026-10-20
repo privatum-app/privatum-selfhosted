@@ -14,6 +14,8 @@ export interface Keys {
 export interface Storage {
   get(key: string): Promise<string | undefined>;
   set(key: string, value: string): Promise<void>;
+  /** Removes everything this app stored (used by logout). */
+  clear(): Promise<void>;
 }
 
 export async function deriveKeys(passphrase: string, salt: Uint8Array<ArrayBuffer>): Promise<Keys> {
@@ -33,9 +35,15 @@ export async function seal(key: CryptoKey, value: unknown): Promise<string> {
   return `${b64(iv)}.${b64(new Uint8Array(ct))}`;
 }
 
-/** Throws on a wrong passphrase or tampered data (AES-GCM authentication). */
+/** Throws `wrong_passphrase` when the data does not authenticate (wrong passphrase or tampered data). */
 export async function open<T>(key: CryptoKey, sealed: string): Promise<T> {
   const [iv, ct] = sealed.split('.');
-  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(iv), additionalData: AAD }, key, fromB64(ct));
+  let pt: ArrayBuffer;
+  try {
+    pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(iv), additionalData: AAD }, key, fromB64(ct));
+  } catch {
+    // Only this step means "wrong passphrase"; any later failure must surface as itself.
+    throw new Error('wrong_passphrase');
+  }
   return JSON.parse(fromUtf8(new Uint8Array(pt))) as T;
 }

@@ -269,3 +269,31 @@ async fn inbox_closes_without_valid_token() {
     ws.send(Message::Text(json!({ "token": "bogus" }).to_string().into())).await.unwrap();
     assert!(matches!(ws.next().await, Some(Ok(Message::Close(_))) | None));
 }
+
+#[tokio::test]
+async fn static_assets_are_cached_and_served_gzipped_but_the_page_is_not() {
+    let dir = std::env::temp_dir().join(format!("privatum-static-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("assets")).unwrap();
+    std::fs::write(dir.join("index.html"), "<!doctype html>").unwrap();
+    std::fs::write(dir.join("assets/app.js"), "console.log(1)").unwrap();
+    std::fs::write(dir.join("assets/app.js.gz"), [0x1f, 0x8b, 0x08, 0x00]).unwrap();
+    let cfg = Config { host: HOST.into(), db_path: ":memory:".into(), message_ttl_days: 14, max_mailboxes: 100 };
+    let r = app(open_state(&cfg).unwrap(), Some(dir.to_str().unwrap()));
+    let get = |uri: &str| {
+        Request::builder().uri(uri).header("accept-encoding", "gzip").body(Body::empty()).unwrap()
+    };
+
+    let asset = r.clone().oneshot(get("/assets/app.js")).await.unwrap();
+    assert_eq!(asset.status(), StatusCode::OK);
+    assert_eq!(asset.headers()["content-encoding"], "gzip");
+    assert!(asset.headers()["cache-control"].to_str().unwrap().contains("immutable"));
+    assert_eq!(asset.headers()["x-frame-options"], "DENY");
+
+    let page = r.clone().oneshot(get("/")).await.unwrap();
+    assert_eq!(page.status(), StatusCode::OK);
+    assert_eq!(page.headers()["cache-control"], "no-store");
+
+    let api = r.oneshot(get("/v1/keys/x")).await.unwrap();
+    assert_eq!(api.headers()["cache-control"], "no-store");
+    std::fs::remove_dir_all(dir).unwrap();
+}

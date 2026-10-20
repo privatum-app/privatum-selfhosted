@@ -36,7 +36,9 @@ COPY client/package.json client/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY client/ ./
 COPY --from=wasm /out/web /app/crypto-wasm/pkg/web
-RUN npm run build
+# Precompressed copies (served by the relay when the browser accepts gzip); -n keeps builds reproducible.
+RUN npm run build \
+ && find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.wasm' -o -name '*.html' -o -name '*.svg' \) -exec gzip -k -9 -n {} +
 
 # --- relay ---
 FROM ${RUST_IMAGE} AS relay

@@ -159,7 +159,7 @@ export class Messenger {
 
   /**
    * Restores an identity from an exported backup. Throws `bad_backup` for a
-   * malformed file and an OperationError for a wrong passphrase.
+   * malformed file and `wrong_passphrase` for a wrong passphrase.
    */
   static async importBackup(text: string, passphrase: string, deps: Deps): Promise<Messenger> {
     let file: { format?: unknown; v?: unknown; salt?: unknown; state?: unknown };
@@ -272,6 +272,13 @@ export class Messenger {
   close() {
     this.stopped = true;
     this.socket?.close();
+  }
+
+  /** Logs out: closes the connection and erases the identity from this browser. */
+  async logout(): Promise<void> {
+    this.close();
+    await this.saving.catch(() => {});
+    await this.deps.storage.clear();
   }
 
   /** Waits until every queued receive/save has finished (used by tests). */

@@ -8,6 +8,7 @@ const MIN_PASSPHRASE = 12;
 
 const ERRORS: Record<string, string> = {
   bad_backup: 'Este arquivo não é um backup do Privatum.',
+  wrong_passphrase: 'Senha incorreta.',
   identity_mismatch: 'As chaves entregues pela instância não correspondem ao convite. Conversa bloqueada por segurança.',
   bad_key_signature: 'A chave do contato tem assinatura inválida. Conversa bloqueada por segurança.',
   bad_invite: 'Convite inválido. Cole o link completo que a pessoa enviou.',
@@ -18,8 +19,11 @@ const ERRORS: Record<string, string> = {
 };
 
 const describe = (e: unknown) => {
-  if (e instanceof TypeError) return 'Não foi possível falar com a instância. Verifique a conexão com o Tor e tente de novo.';
-  const code = e instanceof Error ? e.message : String(e);
+  // fetch() rejects with a TypeError on network failure; other TypeErrors are bugs and must show as-is.
+  if (e instanceof TypeError && /fetch|network/i.test(e.message)) {
+    return 'Não foi possível falar com a instância. Verifique a conexão com o Tor e tente de novo.';
+  }
+  const code = e instanceof Error ? (e.name && e.name !== 'Error' ? `${e.name}: ${e.message}` : e.message) : String(e);
   return ERRORS[code] ?? (e instanceof KeyMismatchError ? ERRORS.identity_mismatch : `Erro: ${code}`);
 };
 
@@ -59,7 +63,14 @@ export function App() {
     setMessenger(null);
     setHasIdentity(true);
   };
-  return <Chat m={messenger} pendingInvite={pendingInvite} clearInvite={() => setPendingInvite(null)} onLock={lock} />;
+  const logout = async () => {
+    await messenger.logout();
+    setMessenger(null);
+    setHasIdentity(false);
+  };
+  return (
+    <Chat m={messenger} pendingInvite={pendingInvite} clearInvite={() => setPendingInvite(null)} onLock={lock} onLogout={logout} />
+  );
 }
 
 function Welcome({ children }: { children: ReactNode }) {
@@ -102,7 +113,7 @@ function Gate({ isNew, deps, onReady }: { isNew: boolean; deps: Deps; onReady: (
             : await Messenger.unlock(pass, deps),
       );
     } catch (err) {
-      setError((err as { name?: string } | null)?.name === 'OperationError' ? 'Senha incorreta.' : describe(err));
+      setError(describe(err));
     } finally {
       setBusy(false);
     }
@@ -152,6 +163,8 @@ interface Confirmation {
   action: string;
   danger?: boolean;
   run: () => void | Promise<void>;
+  /** Optional extra action that keeps the dialog open (e.g. export a backup first). */
+  extra?: { label: string; run: () => void | Promise<void> };
 }
 
 async function downloadBackup(m: Messenger) {
@@ -163,7 +176,19 @@ async function downloadBackup(m: Messenger) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function Chat({ m, pendingInvite, clearInvite, onLock }: { m: Messenger; pendingInvite: string | null; clearInvite: () => void; onLock: () => void }) {
+function Chat({
+  m,
+  pendingInvite,
+  clearInvite,
+  onLock,
+  onLogout,
+}: {
+  m: Messenger;
+  pendingInvite: string | null;
+  clearInvite: () => void;
+  onLock: () => void;
+  onLogout: () => Promise<void>;
+}) {
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const [selected, setSelected] = useState<string | null>(null);
   const [dialog, setDialog] = useState<'invite' | 'add' | null>(pendingInvite ? 'add' : null);
@@ -180,15 +205,17 @@ function Chat({ m, pendingInvite, clearInvite, onLock }: { m: Messenger; pending
 
   const contact = selected ? m.contact(selected) : undefined;
   const contacts = [...m.contacts].sort((a, b) => (b.messages.at(-1)?.at ?? 0) - (a.messages.at(-1)?.at ?? 0));
-  const lock = () =>
-    m.unsaved === 0
-      ? onLock()
-      : setConfirmation({
-          title: 'Sair sem backup?',
-          body: `${m.unsaved === 1 ? 'Uma mensagem ainda não está' : `${m.unsaved} mensagens ainda não estão`} no backup. Se o Tor Browser for fechado, elas se perdem.`,
-          action: 'Sair mesmo assim',
-          run: onLock,
-        });
+  const logout = () =>
+    setConfirmation({
+      title: 'Sair deste navegador?',
+      body:
+        'Sua identidade, contatos e conversas serão apagados deste navegador. Para voltar, você vai precisar do arquivo de backup e da senha local.' +
+        (m.unsaved > 0 ? ` Há ${m.unsaved === 1 ? '1 mensagem' : `${m.unsaved} mensagens`} fora do backup.` : ''),
+      action: 'Sair e apagar',
+      danger: true,
+      run: onLogout,
+      extra: { label: 'Exportar backup', run: () => downloadBackup(m) },
+    });
 
   return (
     <div className="app" data-view={contact ? 'conversation' : 'list'}>
@@ -205,8 +232,11 @@ function Chat({ m, pendingInvite, clearInvite, onLock }: { m: Messenger; pending
             <button className="icon-btn" title="Exportar backup" aria-label="Exportar backup" onClick={() => downloadBackup(m)}>
               <Icon name="download" />
             </button>
-            <button className="icon-btn" title="Sair" aria-label="Sair" onClick={lock}>
+            <button className="icon-btn" title="Trancar (pede a senha de novo)" aria-label="Trancar" onClick={onLock}>
               <Icon name="lock" />
+            </button>
+            <button className="icon-btn" title="Sair (apaga deste navegador)" aria-label="Sair" onClick={logout}>
+              <Icon name="logout" />
             </button>
           </div>
         </header>
@@ -264,6 +294,11 @@ function Chat({ m, pendingInvite, clearInvite, onLock }: { m: Messenger; pending
       <Modal open={confirmation !== null} onClose={() => setConfirmation(null)} title={confirmation?.title ?? ''}>
         <p className="muted">{confirmation?.body}</p>
         <div className="modal-actions">
+          {confirmation?.extra && (
+            <button className="btn quiet" onClick={() => confirmation.extra?.run()}>
+              {confirmation.extra.label}
+            </button>
+          )}
           <button className="btn quiet" onClick={() => setConfirmation(null)}>Cancelar</button>
           <button
             className={confirmation?.danger ? 'btn danger' : 'btn primary'}

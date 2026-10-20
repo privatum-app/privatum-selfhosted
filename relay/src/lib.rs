@@ -218,14 +218,24 @@ pub fn app(state: Shared, static_dir: Option<&str>) -> Router {
         .route("/v1/messages/{id}", delete(delete_message))
         .route("/v1/inbox", get(inbox));
     if let Some(dir) = static_dir {
-        router = router.fallback_service(ServeDir::new(dir));
+        // Vite fingerprints everything under /assets, so it can be cached for good; gzip
+        // copies made at build time cut the WASM/JS download over Tor about threefold.
+        // Static files hold no secrets, so compressing them does not enable BREACH-style attacks.
+        let assets = Router::new()
+            .fallback_service(ServeDir::new(format!("{dir}/assets")).precompressed_gzip())
+            .layer(SetResponseHeaderLayer::overriding(
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("public, max-age=31536000, immutable"),
+            ));
+        router = router
+            .nest_service("/assets", assets)
+            .fallback_service(ServeDir::new(dir).precompressed_gzip());
     }
-    let headers: [(HeaderName, &'static str); 8] = [
+    let headers: [(HeaderName, &'static str); 7] = [
         (header::CONTENT_SECURITY_POLICY, CSP),
         (header::X_FRAME_OPTIONS, "DENY"),
         (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
         (header::REFERRER_POLICY, "no-referrer"),
-        (header::CACHE_CONTROL, "no-store"),
         (HeaderName::from_static("permissions-policy"), PERMISSIONS),
         (HeaderName::from_static("cross-origin-opener-policy"), "same-origin"),
         (HeaderName::from_static("cross-origin-resource-policy"), "same-origin"),
@@ -234,7 +244,8 @@ pub fn app(state: Shared, static_dir: Option<&str>) -> Router {
     for (name, value) in headers {
         router = router.layer(SetResponseHeaderLayer::overriding(name, HeaderValue::from_static(value)));
     }
-    router
+    // API responses and the page itself are never cached; /assets set their own policy.
+    router.layer(SetResponseHeaderLayer::if_not_present(header::CACHE_CONTROL, HeaderValue::from_static("no-store")))
 }
 
 #[derive(Deserialize)]

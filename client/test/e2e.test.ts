@@ -12,7 +12,7 @@ const olm = createRequire(import.meta.url)('../../crypto-wasm/pkg/node/privatum_
 
 function memory(): Storage {
   const m = new Map<string, string>();
-  return { get: async (k) => m.get(k), set: async (k, v) => void m.set(k, v) };
+  return { get: async (k) => m.get(k), set: async (k, v) => void m.set(k, v), clear: async () => m.clear() };
 }
 
 function deps(storage = memory(), fetchFn?: typeof fetch): Deps {
@@ -72,7 +72,7 @@ test('state survives a restart and needs the right passphrase', opts, async () =
   await alice.idle();
   alice.close();
 
-  await assert.rejects(Messenger.unlock('senha errada!!', deps(storage)));
+  await assert.rejects(Messenger.unlock('senha errada!!', deps(storage)), { message: 'wrong_passphrase' });
   const again = await Messenger.unlock('alice passphrase 456', deps(storage));
   try {
     assert.equal(again.mailbox, alice.mailbox);
@@ -104,7 +104,7 @@ test('backup restores the identity on a fresh browser and the chat resumes', opt
     alice.close();
 
     await assert.rejects(Messenger.importBackup('{"format":"other"}', pass, deps()), { message: 'bad_backup' });
-    await assert.rejects(Messenger.importBackup(backup, 'senha errada!!', deps()));
+    await assert.rejects(Messenger.importBackup(backup, 'senha errada!!', deps()), { message: 'wrong_passphrase' });
 
     const restored = await Messenger.importBackup(backup, pass, deps());
     try {
@@ -159,6 +159,15 @@ test('blocking drops a contact and its messages; adding the invite again unblock
     alice.close();
     bob.close();
   }
+});
+
+test('logout erases the identity from this browser', opts, async () => {
+  const storage = memory();
+  const m = await Messenger.create('logout passphrase', deps(storage));
+  assert.equal(await Messenger.exists(storage), true);
+  await m.logout();
+  assert.equal(await Messenger.exists(storage), false);
+  await assert.rejects(Messenger.unlock('logout passphrase', deps(storage)), { message: 'no_identity' });
 });
 
 test('keys swapped by the relay are refused', opts, async () => {
