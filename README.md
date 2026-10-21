@@ -134,10 +134,12 @@ Celulares: o Tor Browser para Android deve funcionar, mas **não foi testado**. 
 
 | | Status |
 |---|---|
-| Hospedar no macOS (Apple Silicon) | testado |
-| Hospedar no Windows ou Linux | **não testado** (as imagens base existem para amd64 e arm64) |
+| Hospedar no macOS (Apple Silicon), inclusive pelo pacote simples com as imagens publicadas | testado |
+| Hospedar no Windows ou Linux | **não testado** (imagens publicadas para amd64 e arm64; a de amd64 foi compilada e executada) |
 | Conversar pelo Tor Browser (desktop, nível Standard) | testado |
-| Tor Browser para Android, Brave com Tor | **não testado** |
+| Tor Browser para Android (15.0.24, via 4G e Wi-Fi) | testado |
+| Mensagem enviada com o destinatário offline e recebida depois de restaurar o backup | testado (Android → macOS) |
+| Brave com Tor, iPhone (Onion Browser) | **não testado** |
 
 ## Como funciona
 
