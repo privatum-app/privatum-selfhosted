@@ -80,9 +80,10 @@ Ninguém se conecta diretamente à máquina: o navegador e a instância só faze
 
 1. **A instância está no ar?** `docker compose ps` deve mostrar `relay`, `tor` e `info` rodando. O computador precisa estar ligado e acordado (desative o repouso).
 2. **O Tor do aparelho funciona com outros `.onion`?** Teste, por exemplo, `https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion`. Se nem esse abre, o problema é o Tor do aparelho.
-3. **Primeira visita:** depois de abrir o Tor Browser, o primeiro acesso pode demorar ou dar "a conexão expirou". Espere dois minutos e tente de novo; recarregar em sequência piora, porque o Tor guarda a falha por alguns minutos.
-4. **Depois de reiniciar o `tor` ou mudar o `torrc`**, o serviço publica uma descrição nova na rede Tor. Por alguns minutos, alguns aparelhos ainda recebem a antiga e falham com "Não foi possível conectar". Espere de 10 a 15 minutos antes de concluir que não funciona.
-5. **Guarda ruim:** se `docker compose logs tor` mostrar *"Guard … is failing more circuits than usual"* e o endereço falhar com frequência, faça o Tor escolher outro guarda. A chave do `.onion` não é tocada; o endereço continua o mesmo:
+3. **O endereço começa com `https://`?** Precisa ser `http://`. A opção "Copiar link" do WhatsApp e de outros apps troca para `https://`, e aí o Tor Browser responde "Não foi possível conectar". Copie a mensagem (segurar → Copiar) em vez do link.
+4. **Primeira visita:** depois de abrir o Tor Browser, o primeiro acesso pode demorar ou dar "a conexão expirou". Espere dois minutos e tente de novo; recarregar em sequência piora, porque o Tor guarda a falha por alguns minutos.
+5. **Depois de reiniciar o `tor` ou mudar o `torrc`**, o serviço publica uma descrição nova na rede Tor. Por alguns minutos, alguns aparelhos ainda recebem a antiga e falham com "Não foi possível conectar". Espere de 10 a 15 minutos antes de concluir que não funciona.
+6. **Guarda ruim:** se `docker compose logs tor` mostrar *"Guard … is failing more circuits than usual"* e o endereço falhar com frequência, faça o Tor escolher outro guarda. A chave do `.onion` não é tocada; o endereço continua o mesmo:
 
    ```bash
    docker compose stop tor

@@ -110,6 +110,8 @@ A instância só fica disponível enquanto o computador estiver ligado e os cont
 2. Coloque o nível de segurança em **Standard** (veja acima).
 3. Abra o endereço `.onion` da instância e crie uma identidade com uma **senha local**. Ela cifra suas chaves e conversas só neste navegador, nunca é enviada ao servidor e **não pode ser recuperada**.
 4. Clique em **Meu convite** e envie o link, por um canal em que você confia, a quem você quer adicionar. A pessoa abre o link no Tor Browser, cria a identidade dela e adiciona você.
+
+   **Atenção ao copiar o convite no celular:** a pessoa deve **segurar a mensagem e escolher "Copiar"**, e colar na barra do Tor Browser. A opção **"Copiar link"** do WhatsApp (e de outros apps) troca `http://` por `https://`, e o endereço deixa de abrir com "Não foi possível conectar". O convite precisa começar com `http://`; pelo Tor a conexão já é cifrada de ponta a ponta.
 5. Abra **Código de segurança** na conversa e compare os 30 dígitos com o contato, por voz ou pessoalmente.
 6. **Antes de fechar o Tor Browser, clique em "Exportar backup".** O Tor Browser apaga os dados dos sites ao fechar: sem o arquivo `.privatum`, sua identidade, contatos e histórico se perdem. Da próxima vez, abra o endereço e use **Restaurar de um backup** com a mesma senha local.
 

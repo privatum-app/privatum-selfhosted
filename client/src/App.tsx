@@ -347,6 +347,10 @@ function MyInvite({ mailbox }: { mailbox: string }) {
         abrir consegue falar só com você.
       </p>
       <code className="invite-link">{link}</code>
+      <p className="hint">
+        Quem receber deve <strong>segurar a mensagem e escolher “Copiar”</strong>, e colar no Tor Browser. “Copiar link” no WhatsApp e
+        em outros apps troca <code>http</code> por <code>https</code>, e o endereço deixa de abrir.
+      </p>
       <button
         className="btn primary"
         onClick={async () => {
