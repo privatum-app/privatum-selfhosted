@@ -74,6 +74,32 @@ Depois da troca:
 
 Quando faz sentido trocar: se a chave vazou (quem a tem pode se passar pela sua instância) ou para cortar o vínculo com um endereço que circulou demais. Para voltar a um endereço antigo, só restaurando o backup da pasta `hs` (seção anterior); sem ele, o endereço antigo está perdido.
 
+## Quando o endereço `.onion` não abre
+
+Ninguém se conecta diretamente à máquina: o navegador e a instância só fazem conexões de saída para a rede Tor. Firewall, roteador e "mesma rede Wi-Fi" não influenciam. Siga nesta ordem:
+
+1. **A instância está no ar?** `docker compose ps` deve mostrar `relay`, `tor` e `info` rodando. O computador precisa estar ligado e acordado (desative o repouso).
+2. **O Tor do aparelho funciona com outros `.onion`?** Teste, por exemplo, `https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion`. Se nem esse abre, o problema é o Tor do aparelho.
+3. **Primeira visita:** depois de abrir o Tor Browser, o primeiro acesso pode demorar ou dar "a conexão expirou". Espere dois minutos e tente de novo; recarregar em sequência piora, porque o Tor guarda a falha por alguns minutos.
+4. **Depois de reiniciar o `tor` ou mudar o `torrc`**, o serviço publica uma descrição nova na rede Tor. Por alguns minutos, alguns aparelhos ainda recebem a antiga e falham com "Não foi possível conectar". Espere de 10 a 15 minutos antes de concluir que não funciona.
+5. **Guarda ruim:** se `docker compose logs tor` mostrar *"Guard … is failing more circuits than usual"* e o endereço falhar com frequência, faça o Tor escolher outro guarda. A chave do `.onion` não é tocada; o endereço continua o mesmo:
+
+   ```bash
+   docker compose stop tor
+   ```
+
+   ```bash
+   docker run --rm -v privatum_tor-state:/s debian:bookworm-slim rm -f /s/data/state
+   ```
+
+   ```bash
+   docker compose start tor
+   ```
+
+   O Tor mantém o mesmo guarda por meses de propósito (dificulta certos ataques de identificação), então só faça isso quando o guarda estiver de fato falhando.
+
+O serviço é configurado com 5 pontos de introdução (o padrão do Tor é 3), o que dá aos visitantes mais caminhos de entrada quando parte dos circuitos falha.
+
 ## Atualizar
 
 As imagens base e a versão do Tor são fixadas. Quando o Tor Project publica uma versão nova, o build do contêiner `tor` passa a falhar de propósito. Leia as notas da versão, ajuste `TOR_VERSION` em `deploy/tor.Dockerfile` e rode `docker compose build && docker compose up -d`.

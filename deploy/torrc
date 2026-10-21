@@ -7,3 +7,5 @@ Log notice stdout
 HiddenServiceDir /var/lib/tor/hs
 # Tor needs an IP target, not a hostname: the relay's fixed address on the internal network.
 HiddenServicePort 80 172.30.0.10:8080
+# More introduction points (default 3) give clients more ways in when some Tor circuits fail.
+HiddenServiceNumIntroductionPoints 5

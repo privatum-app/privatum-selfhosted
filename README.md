@@ -73,7 +73,7 @@ O comando acima mostra o endereço (algo como `abc...xyz.onion`). Ele também ap
 Pronto: não há outro programa para abrir. Daqui em diante **todo mundo, inclusive quem hospeda, entra pelo Tor Browser**:
 
 1. Abra o Tor Browser (no nível **Standard**) e cole o endereço `.onion` na barra de endereço.
-2. Na primeira visita depois de abrir o Tor Browser, a página pode demorar ou dar "a conexão expirou": o Tor ainda está montando o caminho até o serviço. Clique em **Tentar novamente**; das próximas vezes é rápido.
+2. Na primeira visita depois de abrir o Tor Browser, a página pode demorar ou dar "a conexão expirou": o Tor ainda está montando o caminho até o serviço. Espere dois minutos e clique em **Tentar novamente**; das próximas vezes é rápido. Se continuar sem abrir, veja [Quando o endereço .onion não abre](docs/OPERATIONS.md#quando-o-endereço-onion-não-abre).
 3. Crie sua identidade e envie o seu convite (ícone de link) a quem quiser. Quem recebe só precisa do Tor Browser: **não instala Docker nem o Privatum**.
 
 Não existe acesso por `localhost` nem por IP: a instância só responde pelo endereço `.onion`, e é a esse endereço que as assinaturas de login ficam presas.
