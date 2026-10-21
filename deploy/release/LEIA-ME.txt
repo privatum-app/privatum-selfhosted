@@ -1,0 +1,26 @@
+PRIVATUM - instalação simples
+=============================
+
+Pré-alfa, sem auditoria externa. Não use para nada sensível.
+
+1. Instale o Docker:
+   - Windows e macOS: Docker Desktop (https://docs.docker.com/desktop/)
+   - Linux: Docker Engine com o plugin Compose (https://docs.docker.com/engine/install/)
+
+2. Dê dois cliques no atalho do seu sistema:
+   - Windows: iniciar.bat
+   - macOS:   iniciar.command  (na primeira vez: botão direito > Abrir, porque o
+              macOS bloqueia scripts baixados da internet)
+   - Linux:   iniciar.sh       (ou, no terminal: ./iniciar.sh)
+
+   Na primeira vez ele baixa as imagens do Privatum (cerca de 200 MB). No fim,
+   abre no seu navegador uma página com o endereço .onion da sua instância.
+
+3. Abra esse endereço no Tor Browser (https://www.torproject.org/download/),
+   no nível de segurança Standard. Crie sua identidade e envie o seu convite.
+
+Para parar: parar.bat / parar.command / parar.sh. Seus dados e o endereço .onion
+são mantidos. A instância só fica no ar com o computador ligado e o Docker rodando.
+
+IMPORTANTE: o endereço .onion vem de uma chave guardada no Docker (volume
+privatum_tor-state). Faça backup dela; veja docs/OPERATIONS.md no projeto.

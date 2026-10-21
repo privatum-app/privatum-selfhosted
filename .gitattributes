@@ -2,3 +2,4 @@
 # Windows would otherwise check them out with CRLF (breaking tor-entrypoint.sh).
 * text=auto eol=lf
 *.wasm binary
+*.bat text eol=crlf

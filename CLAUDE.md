@@ -34,7 +34,7 @@ Rust não está instalado na máquina: tudo compila em contêiner.
 
 - Não escrever criptografia própria. Usar só as primitivas do vodozemac e da WebCrypto.
 - Toda mudança de segurança passa pelos requisitos R1–R10 de `docs/THREAT-MODEL.md`. Verificação que falha deve bloquear (falhar fechado).
-- Imagens: sem root, sistema de arquivos somente leitura, sem segredos, bases fixadas por digest. Pendentes: cosign, SBOM e verificação de build reproduzível.
+- Imagens: sem root, sistema de arquivos somente leitura, sem segredos, bases fixadas por digest. Releases (tag `v*`) publicam imagens amd64/arm64 assinadas com cosign e com SBOM via `.github/workflows/release.yml`, mais o pacote simples (`deploy/release/make-bundle.sh`). Pendente: verificar build reproduzível.
 - A chave do serviço onion fica no volume `privatum_tor-state`; documentar backup e permissões em `docs/OPERATIONS.md`.
 - Não afirmar "100% seguro", "sigilo perfeito" ou "anônimo". O anonimato depende de como a pessoa hospeda e usa; o cliente exige o nível Standard do Tor Browser (WASM).
 - Não commitar `.env`, chaves, bancos SQLite, backups da chave onion nem `node_modules`.
@@ -43,7 +43,7 @@ Rust não está instalado na máquina: tudo compila em contêiner.
 
 ## Próximos passos
 
-1. Assinar imagens (cosign), gerar SBOM e testar build reproduzível.
+1. Testar build reproduzível; testar o pacote simples em Windows e Linux.
 2. Definir o canal para relatar vulnerabilidades (`SECURITY.md` está "a definir").
 3. Fase 2: app local opcional (resolve os limites L1 e L2) e reavaliar o Arti.
 4. Fase 3: auditoria externa antes de abrir ao público.

@@ -8,8 +8,8 @@ ARG RUST_IMAGE=rust:1.90-bookworm@sha256:3914072ca0c3b8aad871db9169a651ccfce30cf
 ARG NODE_IMAGE=node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5
 ARG RUNTIME_IMAGE=gcr.io/distroless/cc-debian12:nonroot@sha256:9dac0a79194e45a7da0158a9c6da57b217585af0786db3845d1f0ec1a0dd182f
 
-# --- vodozemac WASM bindings ---
-FROM ${RUST_IMAGE} AS wasm
+# --- vodozemac WASM bindings (architecture-independent: built once, on the build machine) ---
+FROM --platform=$BUILDPLATFORM ${RUST_IMAGE} AS wasm
 # The CLI version must equal the wasm-bindgen crate version pinned in crypto-wasm/Cargo.toml.
 ARG WASM_BINDGEN_VERSION=0.2.129
 RUN rustup target add wasm32-unknown-unknown \
@@ -29,8 +29,8 @@ RUN cargo build --release --locked --target wasm32-unknown-unknown \
 FROM scratch AS wasm-out
 COPY --from=wasm /out /
 
-# --- web client ---
-FROM ${NODE_IMAGE} AS client
+# --- web client (architecture-independent) ---
+FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS client
 WORKDIR /app/client
 COPY client/package.json client/package-lock.json ./
 RUN npm ci --no-audit --no-fund

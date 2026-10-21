@@ -100,6 +100,18 @@ Ninguém se conecta diretamente à máquina: o navegador e a instância só faze
 
 O serviço é configurado com 5 pontos de introdução (o padrão do Tor é 3), o que dá aos visitantes mais caminhos de entrada quando parte dos circuitos falha.
 
+## Conferir as imagens
+
+As imagens publicadas (`ghcr.io/privatum-app/privatum-relay` e `ghcr.io/privatum-app/privatum-tor`) são compiladas pelo GitHub Actions (`.github/workflows/release.yml`), assinadas com **cosign** sem chave guardada (identidade OIDC do workflow) e acompanhadas de **SBOM** e de proveniência do build. O `compose.yaml` do pacote fixa cada imagem pelo digest, então o Docker recusa uma imagem trocada.
+
+Para conferir a assinatura (troque a versão):
+
+```bash
+cosign verify ghcr.io/privatum-app/privatum-relay:v0.1.0 --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp '^https://github.com/privatum-app/privatum-selfhosted/\.github/workflows/release\.yml@refs/tags/v'
+```
+
+Repita com `privatum-tor`. Para ver o SBOM: `docker buildx imagetools inspect ghcr.io/privatum-app/privatum-relay:v0.1.0 --format '{{ json .SBOM }}'`.
+
 ## Atualizar
 
 As imagens base e a versão do Tor são fixadas. Quando o Tor Project publica uma versão nova, o build do contêiner `tor` passa a falhar de propósito. Leia as notas da versão, ajuste `TOR_VERSION` em `deploy/tor.Dockerfile` e rode `docker compose build && docker compose up -d`.
@@ -110,5 +122,4 @@ O serviço onion esconde o IP do servidor de quem usa. Ele **não** esconde voc�
 
 ## Ainda não feito
 
-- Assinatura das imagens (cosign) e SBOM.
 - Verificação de build reproduzível (as imagens já fixam bases e removem caminhos do binário, mas a reprodutibilidade não foi testada).

@@ -24,9 +24,23 @@ Como mudar: ícone do escudo na barra → **Configurações de segurança** → 
 
 Ninguém precisa abrir portas no roteador, ter domínio, IP fixo ou certificado TLS: o Tor cuida disso.
 
-## Hospedar uma instância
+## Instalação simples (recomendada)
 
-Requisitos: cerca de **6 GB livres** de disco durante o primeiro build (as imagens finais ocupam ~200 MB) e conexão com a internet. O primeiro build leva **vários minutos**, porque compila o relay em Rust e a criptografia em WebAssembly dentro dos contêineres; não é preciso instalar Rust nem Node.
+Não precisa de Git, terminal nem compilar nada; só do Docker.
+
+1. Instale o **Docker Desktop** ([Windows](https://docs.docker.com/desktop/setup/install/windows-install/), [macOS](https://docs.docker.com/desktop/setup/install/mac-install/)) ou, no Linux, o [Docker Engine](https://docs.docker.com/engine/install/) com o plugin Compose.
+2. Baixe o arquivo `privatum-vX.Y.Z.zip` na página de [Releases](../../releases) e extraia em uma pasta qualquer.
+3. Dê **dois cliques** no atalho do seu sistema:
+   - **Windows:** `iniciar.bat`
+   - **macOS:** `iniciar.command` (na primeira vez, clique com o botão direito → **Abrir**, porque o macOS bloqueia scripts baixados da internet)
+   - **Linux:** `iniciar.sh`
+4. Na primeira vez ele baixa as imagens prontas (cerca de 200 MB). No fim, abre no navegador uma página com o **endereço `.onion`** da sua instância. Siga daí para [Acesse pelo Tor Browser](#4-acesse-pelo-tor-browser).
+
+Para parar: `parar.bat`, `parar.command` ou `parar.sh`. Seus dados e o endereço são mantidos. As imagens são assinadas e trazem SBOM; como conferir está em [docs/OPERATIONS.md](docs/OPERATIONS.md#conferir-as-imagens).
+
+## Hospedar a partir do código-fonte
+
+Para quem quer compilar tudo localmente ou contribuir. Requisitos: cerca de **6 GB livres** de disco durante o primeiro build (as imagens finais ocupam ~200 MB) e conexão com a internet. O primeiro build leva **vários minutos**, porque compila o relay em Rust e a criptografia em WebAssembly dentro dos contêineres; não é preciso instalar Rust nem Node.
 
 ### 1. Instale o Docker e o Git
 
