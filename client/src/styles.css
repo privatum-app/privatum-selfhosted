@@ -76,7 +76,7 @@ h1, h2, p { margin: 0; }
 .welcome-mark { display: grid; justify-items: center; gap: 1rem; text-align: center; max-width: 30rem; }
 .logo { flex: none; display: block; fill: var(--accent); }
 .brandmark { display: flex; align-items: center; gap: 0.9rem; }
-.brandmark .logo { filter: drop-shadow(0 0 18px rgb(52 211 153 / 0.45)); }
+.brandmark .logo, .conv-empty .logo { filter: drop-shadow(0 0 18px rgb(52 211 153 / 0.45)); }
 .wordmark { font-size: 4rem; font-weight: 800; letter-spacing: -0.05em; line-height: 1; color: #f2f7f4; }
 .tagline { color: var(--muted); max-width: 26rem; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-panel); }

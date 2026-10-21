@@ -270,9 +270,11 @@ function Chat({
           <Conversation key={contact.mailbox} m={m} c={contact} onBack={() => setSelected(null)} onConfirm={setConfirmation} />
         ) : (
           <div className="conv-empty">
-            <Sigil seed={m.mailbox} size={72} />
+            <Logo size={96} />
             <p>Escolha uma conversa ou comece uma nova.</p>
-            <button className="btn quiet" onClick={() => setDialog('invite')}>Mostrar meu convite</button>
+            <button className="btn primary" onClick={() => setDialog('invite')}>
+              <Icon name="link" /> Mostrar meu convite
+            </button>
           </div>
         )}
       </section>
