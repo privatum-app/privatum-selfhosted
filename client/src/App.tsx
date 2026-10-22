@@ -183,6 +183,8 @@ const unlockAudio = () => {
     // no Web Audio in this browser: stay silent
   }
 };
+// Listening from page load lets the click on "Desbloquear" itself unlock the sound.
+GESTURES.forEach((e) => addEventListener(e, unlockAudio));
 function chime() {
   if (!audio) return;
   if (audio.state !== 'running') {
@@ -246,16 +248,11 @@ function Chat({
   mutedRef.current = muted;
   useEffect(() => m.subscribe(rerender), [m]);
   useEffect(() => {
-    GESTURES.forEach((e) => addEventListener(e, unlockAudio));
-    const off = m.onIncoming((mailbox) => {
+    return m.onIncoming((mailbox) => {
       if (!mutedRef.current) chime();
       if (!document.hidden && mailbox === selectedRef.current) return;
       setUnread((u) => ({ ...u, [mailbox]: (u[mailbox] ?? 0) + 1 }));
     });
-    return () => {
-      off();
-      GESTURES.forEach((e) => removeEventListener(e, unlockAudio));
-    };
   }, [m]);
   // Reading a conversation (and coming back to the tab) clears its counter.
   useEffect(() => {
@@ -573,7 +570,7 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
   return (
     <>
       <header className="conv-head">
-        <button className="icon-btn back" aria-label="Voltar para as conversas" onClick={onBack}>
+        <button className="icon-btn back" aria-label="Fechar conversa" title="Fechar conversa" onClick={onBack}>
           <Icon name="back" />
         </button>
         <Avatar avatar={c.avatar} seed={c.mailbox} size={40} />

@@ -118,7 +118,6 @@ h1, h2, p { margin: 0; }
 .conversation { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .conv-empty { margin: auto; display: grid; justify-items: center; gap: 1rem; padding: 2rem; color: var(--muted); text-align: center; }
 .conv-head { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--line); }
-.conv-head .back { display: none; }
 .conv-title { flex: 1; min-width: 0; display: grid; gap: 0.1rem; justify-items: start; }
 .conv-title h2 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .trust { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0; border: 0; background: none; cursor: pointer; font-size: 0.82rem; font-weight: 500; }
@@ -181,7 +180,6 @@ h1, h2, p { margin: 0; }
   .app[data-view='list'] .conversation, .app[data-view='conversation'] .sidebar { display: none; }
   .sidebar { border-right: 0; }
   .conv-head { padding: 0.5rem 0.75rem; }
-  .conv-head .back { display: inline-grid; }
   .bubble { max-width: 85%; }
   .wordmark { font-size: 2.75rem; }
 }
