@@ -40,6 +40,36 @@ export function Sigil({ seed, size = 40 }: { seed: string; size?: number }) {
   );
 }
 
+// Gallery avatars: 5 shapes x 4 inner patterns, in the brand's black/green/white.
+// Index order is part of the protocol (contacts receive only the index), so only append.
+const SHAPES = [
+  'M24 6a18 18 0 1 1 0 36a18 18 0 1 1 0-36z', // circle
+  'M13 8h22a5 5 0 0 1 5 5v22a5 5 0 0 1-5 5H13a5 5 0 0 1-5-5V13a5 5 0 0 1 5-5z', // rounded square
+  'M24 6l20 34H4z', // triangle
+  'M24 4l20 20-20 20L4 24z', // diamond
+  'M24 5l16.5 9.5v19L24 43 7.5 33.5v-19z', // hexagon
+];
+const FILLS = ['#34d399', '#a7f3d0', '#e3ebe6', '#10b981'];
+
+/** One gallery avatar, or the onion sigil when none was chosen. */
+export function Avatar({ avatar, seed, size = 40 }: { avatar?: number; seed: string; size?: number }) {
+  if (avatar === undefined) return <Sigil seed={seed} size={size} />;
+  const shape = SHAPES[avatar % 5];
+  const pattern = Math.floor(avatar / 5) % 4;
+  const fill = FILLS[(avatar + pattern) % FILLS.length];
+  return (
+    <svg className="sigil" width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+      <circle cx="24" cy="24" r="23.5" className="sigil-bg" />
+      <g transform="translate(24 24) scale(0.72) translate(-24 -24)">
+        <path d={shape} fill={pattern === 1 ? 'none' : fill} stroke={fill} strokeWidth={pattern === 1 ? 4 : 0} strokeLinejoin="round" />
+        {pattern === 2 && <circle cx="24" cy="26" r="6" fill="#0b0f0d" />}
+        {pattern === 3 && <path d="M14 26h20M14 32h20" stroke="#0b0f0d" strokeWidth="3.5" strokeLinecap="round" />}
+        {pattern === 1 && <circle cx="24" cy="26" r="4.5" fill={fill} />}
+      </g>
+    </svg>
+  );
+}
+
 /** The Privatum key mark (vector redraw of the brand logo). */
 export function Logo({ size = 32 }: { size?: number }) {
   return (
@@ -64,6 +94,8 @@ const PATHS: Record<string, string> = {
   more: 'M6 12h.01M12 12h.01M18 12h.01',
   shield: 'M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z',
   check: 'M8.5 12.5l2.5 2.5 4.5-5',
+  sound: 'M5 9v6h4l5 4V5L9 9zM17 9a4 4 0 0 1 0 6',
+  muted: 'M5 9v6h4l5 4V5L9 9zM17 9l4 6M21 9l-4 6',
 };
 
 export function Icon({ name }: { name: keyof typeof PATHS | string }) {

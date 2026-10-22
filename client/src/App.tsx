@@ -1,8 +1,8 @@
 import { useEffect, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { inviteLink, parseInvite, safetyCode } from './core/identity.ts';
-import { KeyMismatchError, Messenger, type Contact, type Deps } from './core/messenger.ts';
+import { AVATAR_COUNT, KeyMismatchError, Messenger, type Contact, type Deps, type Message } from './core/messenger.ts';
 import { loadOlm, storage } from './platform.ts';
-import { Icon, Logo, Modal, Sigil } from './ui.tsx';
+import { Avatar, Icon, Logo, Modal, Sigil } from './ui.tsx';
 
 const MIN_PASSPHRASE = 12;
 
@@ -167,6 +167,38 @@ interface Confirmation {
   extra?: { label: string; run: () => void | Promise<void> };
 }
 
+// Short two-note chime built with Web Audio (no audio file to download over Tor).
+// Browsers only allow sound after a user gesture, so the context is created on the first click/key.
+let audio: AudioContext | null = null;
+const unlockAudio = () => {
+  audio ??= new AudioContext();
+  void audio.resume();
+};
+function chime() {
+  if (!audio || audio.state !== 'running') return;
+  const t = audio.currentTime;
+  [880, 1320].forEach((freq, i) => {
+    const osc = audio!.createOscillator();
+    const gain = audio!.createGain();
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, t + i * 0.12);
+    gain.gain.exponentialRampToValueAtTime(0.08, t + i * 0.12 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.12 + 0.25);
+    osc.connect(gain).connect(audio!.destination);
+    osc.start(t + i * 0.12);
+    osc.stop(t + i * 0.12 + 0.3);
+  });
+}
+
+// Visual preference only (THREAT-MODEL R9 allows non-secret preferences in localStorage).
+const readMuted = () => {
+  try {
+    return localStorage.getItem('privatum-muted') === '1';
+  } catch {
+    return false;
+  }
+};
+
 async function downloadBackup(m: Messenger) {
   const url = URL.createObjectURL(new Blob([await m.exportBackup()], { type: 'application/octet-stream' }));
   const a = document.createElement('a');
@@ -191,9 +223,47 @@ function Chat({
 }) {
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const [selected, setSelected] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<'invite' | 'add' | null>(pendingInvite ? 'add' : null);
+  const [dialog, setDialog] = useState<'invite' | 'add' | 'avatar' | null>(pendingInvite ? 'add' : null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [muted, setMuted] = useState(readMuted);
+  const [unread, setUnread] = useState<Record<string, number>>({});
+  const selectedRef = useRef(selected);
+  const mutedRef = useRef(muted);
+  selectedRef.current = selected;
+  mutedRef.current = muted;
   useEffect(() => m.subscribe(rerender), [m]);
+  useEffect(() => {
+    addEventListener('pointerdown', unlockAudio, { once: true });
+    addEventListener('keydown', unlockAudio, { once: true });
+    return m.onIncoming((mailbox) => {
+      if (!document.hidden && mailbox === selectedRef.current) return;
+      setUnread((u) => ({ ...u, [mailbox]: (u[mailbox] ?? 0) + 1 }));
+      if (!mutedRef.current) chime();
+    });
+  }, [m]);
+  // Reading a conversation (and coming back to the tab) clears its counter.
+  useEffect(() => {
+    const clear = () => {
+      if (!document.hidden && selectedRef.current) setUnread((u) => ({ ...u, [selectedRef.current!]: 0 }));
+    };
+    clear();
+    document.addEventListener('visibilitychange', clear);
+    return () => document.removeEventListener('visibilitychange', clear);
+  }, [selected]);
+  const totalUnread = Object.values(unread).reduce((a, b) => a + b, 0);
+  useEffect(() => {
+    document.title = totalUnread > 0 ? `(${totalUnread}) Privatum` : 'Privatum';
+  }, [totalUnread]);
+  const toggleMuted = () => {
+    setMuted((v) => {
+      try {
+        localStorage.setItem('privatum-muted', v ? '0' : '1');
+      } catch {
+        // storage unavailable: the choice lasts for this session only
+      }
+      return !v;
+    });
+  };
   // Tor Browser wipes site data on close: warn before leaving with unsaved messages.
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => {
@@ -241,6 +311,16 @@ function Chat({
           </div>
         </header>
 
+        <div className="me-row">
+          <button className="me-avatar" onClick={() => setDialog('avatar')} title="Escolher meu avatar">
+            <Avatar avatar={m.avatar} seed={m.mailbox} size={36} />
+            <span>Meu avatar</span>
+          </button>
+          <button className="icon-btn" onClick={toggleMuted} title={muted ? 'Ativar som' : 'Silenciar'} aria-label={muted ? 'Ativar som' : 'Silenciar'} aria-pressed={!muted}>
+            <Icon name={muted ? 'muted' : 'sound'} />
+          </button>
+        </div>
+
         {m.unsaved > 0 && (
           <button className="backup-alert" onClick={() => downloadBackup(m)}>
             <strong>{m.unsaved === 1 ? '1 mensagem fora do backup' : `${m.unsaved} mensagens fora do backup`}</strong>
@@ -258,7 +338,7 @@ function Chat({
           <ul className="contacts">
             {contacts.map((c) => (
               <li key={c.mailbox}>
-                <ContactRow c={c} active={c.mailbox === selected} onOpen={() => setSelected(c.mailbox)} />
+                <ContactRow c={c} unread={c.mailbox === selected ? 0 : unread[c.mailbox] ?? 0} active={c.mailbox === selected} onOpen={() => setSelected(c.mailbox)} />
               </li>
             ))}
           </ul>
@@ -279,6 +359,34 @@ function Chat({
         )}
       </section>
 
+      <Modal open={dialog === 'avatar'} onClose={() => setDialog(null)} title="Meu avatar">
+        <p className="muted">Escolha como você aparece para os seus contatos. O avatar vai cifrado dentro das mensagens; a instância não sabe qual é.</p>
+        <div className="avatar-grid">
+          {Array.from({ length: AVATAR_COUNT }, (_, i) => (
+            <button
+              key={i}
+              className={m.avatar === i ? 'avatar-choice active' : 'avatar-choice'}
+              aria-label={`Avatar ${i + 1}`}
+              aria-pressed={m.avatar === i}
+              onClick={() => {
+                void m.setAvatar(i);
+                setDialog(null);
+              }}
+            >
+              <Avatar avatar={i} seed={m.mailbox} size={48} />
+            </button>
+          ))}
+        </div>
+        <button
+          className="btn quiet"
+          onClick={() => {
+            void m.setAvatar(null);
+            setDialog(null);
+          }}
+        >
+          Usar o padrão (anéis)
+        </button>
+      </Modal>
       <Modal open={dialog === 'invite'} onClose={() => setDialog(null)} title="Meu convite">
         <MyInvite mailbox={m.mailbox} />
       </Modal>
@@ -318,19 +426,20 @@ function Chat({
   );
 }
 
-function ContactRow({ c, active, onOpen }: { c: Contact; active: boolean; onOpen: () => void }) {
+function ContactRow({ c, active, unread, onOpen }: { c: Contact; active: boolean; unread: number; onOpen: () => void }) {
   const last = c.messages.at(-1);
   return (
     <button className={active ? 'contact active' : 'contact'} onClick={onOpen} aria-current={active || undefined}>
-      <Sigil seed={c.mailbox} size={40} />
+      <Avatar avatar={c.avatar} seed={c.mailbox} size={40} />
       <span className="contact-text">
         <span className="contact-top">
           <span className="contact-name">{c.name}</span>
           {last && <time>{time(last.at)}</time>}
+          {unread > 0 && <span className="unread" aria-label={`${unread} novas`}>{unread}</span>}
         </span>
         <span className="contact-preview">
           {!c.verified && !c.addedByMe ? <span className="tag warn">não verificado</span> : c.verified && <span className="tag ok">verificado</span>}
-          <span className="preview-text">{last ? `${last.out ? 'Você: ' : ''}${last.text}` : 'Sem mensagens'}</span>
+          <span className="preview-text">{last ? (last.deleted ? 'Mensagem apagada' : `${last.out ? 'Você: ' : ''}${last.text}`) : 'Sem mensagens'}</span>
         </span>
       </span>
     </button>
@@ -414,6 +523,8 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
   const [error, setError] = useState('');
   const [code, setCode] = useState('');
   const [showCode, setShowCode] = useState(false);
+  const [actionsFor, setActionsFor] = useState<Message | null>(null);
+  const [editing, setEditing] = useState<Message | null>(null);
   const end = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -430,9 +541,12 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
     if (!text.trim()) return;
     setError('');
     const t = text;
+    const target = editing;
     setText('');
+    setEditing(null);
     try {
-      await m.send(c.mailbox, t);
+      if (target?.id) await m.editMessage(c.mailbox, target.id, t);
+      else await m.send(c.mailbox, t);
     } catch (err) {
       setError(describe(err));
     }
@@ -445,7 +559,7 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
         <button className="icon-btn back" aria-label="Voltar para as conversas" onClick={onBack}>
           <Icon name="back" />
         </button>
-        <Sigil seed={c.mailbox} size={40} />
+        <Avatar avatar={c.avatar} seed={c.mailbox} size={40} />
         <div className="conv-title">
           <h2>{c.name}</h2>
           <button className={`trust ${trust}`} onClick={() => setShowCode(true)}>
@@ -509,15 +623,85 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
           <p className="muted messages-empty">Nenhuma mensagem ainda. Tudo o que você escrever é cifrado antes de sair deste navegador.</p>
         )}
         {c.messages.map((msg, i) => (
-          <div key={i} className={msg.out ? 'bubble out' : 'bubble in'}>
-            <p>{msg.text}</p>
-            <time>{time(msg.at)}{msg.failed ? ' · não enviada' : ''}</time>
+          <div key={i} className={msg.out ? 'msg out' : 'msg in'}>
+            <button
+              className={msg.out ? 'bubble out' : 'bubble in'}
+              aria-expanded={actionsFor === msg}
+              onClick={() => setActionsFor(actionsFor === msg ? null : msg)}
+            >
+              {msg.deleted ? <span className="bubble-text deleted">Mensagem apagada</span> : <span className="bubble-text">{msg.text}</span>}
+              <time>
+                {time(msg.at)}
+                {msg.edited && !msg.deleted ? ' · editada' : ''}
+                {msg.failed ? ' · não enviada' : ''}
+              </time>
+            </button>
+            {actionsFor === msg && (
+              <div className="msg-actions">
+                {msg.out && msg.id && !msg.deleted && (
+                  <button
+                    onClick={() => {
+                      setEditing(msg);
+                      setText(msg.text);
+                      setActionsFor(null);
+                    }}
+                  >
+                    Editar
+                  </button>
+                )}
+                {msg.out && msg.id && !msg.deleted && (
+                  <button
+                    className="danger"
+                    onClick={() => {
+                      setActionsFor(null);
+                      onConfirm({
+                        title: 'Apagar para todos?',
+                        body: 'A mensagem será apagada aqui e no aparelho do contato. Não há como garantir que ele não a viu, não fez captura de tela nem tem um backup anterior.',
+                        action: 'Apagar para todos',
+                        danger: true,
+                        run: () => m.deleteMessage(c.mailbox, msg, true).catch((err) => setError(describe(err))),
+                      });
+                    }}
+                  >
+                    Apagar para todos
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setActionsFor(null);
+                    onConfirm({
+                      title: 'Apagar para mim?',
+                      body: 'A mensagem some só deste aparelho. O contato continua com ela.',
+                      action: 'Apagar para mim',
+                      danger: true,
+                      run: () => m.deleteMessage(c.mailbox, msg, false),
+                    });
+                  }}
+                >
+                  Apagar para mim
+                </button>
+              </div>
+            )}
           </div>
         ))}
         <div ref={end} />
       </div>
 
       {error && <p className="notice danger composer-error" role="alert">{error}</p>}
+      {editing && (
+        <div className="editing-bar">
+          <span>Editando mensagem</span>
+          <button
+            className="link"
+            onClick={() => {
+              setEditing(null);
+              setText('');
+            }}
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
       <form className="composer" onSubmit={send}>
         <textarea
           value={text}

@@ -1,6 +1,6 @@
 // Messaging logic, independent of React and of the browser (runs in Node tests).
 // All cryptography is vodozemac's (via `olm`); this file only wires it up.
-import { concat, fromB64, fromUtf8, utf8 } from './encoding.ts';
+import { b64, concat, fromB64, fromUtf8, utf8 } from './encoding.ts';
 import { isMailboxId, mailboxId } from './identity.ts';
 import { Relay, type Delivered, type SignedKey } from './relay.ts';
 import { deriveKeys, open, seal, type Keys, type Storage } from './vault.ts';
@@ -31,11 +31,19 @@ export interface Olm {
 }
 
 export interface Message {
+  /** Random id carried inside the encrypted payload; lets the sender edit or delete it. */
+  id?: string;
   out: boolean;
   text: string;
   at: number;
   failed?: boolean;
+  edited?: boolean;
+  deleted?: boolean;
 }
+
+/** Number of avatars in the client's gallery; contacts only ever send an index. */
+export const AVATAR_COUNT = 20;
+const isAvatar = (x: unknown): x is number => Number.isInteger(x) && (x as number) >= 0 && (x as number) < AVATAR_COUNT;
 
 export interface Contact {
   mailbox: string;
@@ -46,6 +54,8 @@ export interface Contact {
   addedByMe: boolean;
   verified: boolean;
   messages: Message[];
+  /** Avatar index the contact chose (sent to us encrypted); none means the sigil. */
+  avatar?: number;
 }
 
 interface Saved {
@@ -60,6 +70,8 @@ interface Saved {
   unsaved?: number;
   /** Mailboxes whose messages are dropped unread. */
   blocked?: string[];
+  /** Our own avatar index, shared with contacts inside encrypted messages. */
+  avatar?: number;
 }
 
 const BACKUP_FORMAT = 'privatum-backup';
@@ -108,6 +120,7 @@ export class Messenger {
   private socket: WebSocket | null = null;
   private stopped = false;
   private listeners = new Set<() => void>();
+  private incoming = new Set<(mailbox: string) => void>();
   readonly relay: Relay;
 
   private constructor(deps: Deps, keys: Keys, account: OlmAccount, state: Saved) {
@@ -339,6 +352,68 @@ export class Messenger {
     const c = this.state.contacts[mailbox];
     const body = text.trim();
     if (!c || !body || body.length > MAX_TEXT) throw new Error('bad_message');
+    const at = Date.now();
+    const id = b64(crypto.getRandomValues(new Uint8Array(9)));
+    const msg: Message = { id, out: true, text: body, at };
+    c.messages.push(msg);
+    await this.deliver(mailbox, { k: 'text', id, b: body, t: at, a: this.state.avatar }, () => {
+      msg.failed = true;
+    });
+  }
+
+  /** Edits one of our own messages here and on the contact's device. */
+  async editMessage(mailbox: string, id: string, text: string): Promise<void> {
+    const c = this.state.contacts[mailbox];
+    const msg = c?.messages.find((m) => m.out && m.id === id && !m.deleted);
+    const body = text.trim();
+    if (!c || !msg || !body || body.length > MAX_TEXT) throw new Error('bad_message');
+    msg.text = body;
+    msg.edited = true;
+    await this.deliver(mailbox, { k: 'edit', id, b: body });
+  }
+
+  /**
+   * Deletes a message. "For everyone" only applies to our own messages and is a
+   * request: a modified client, a screenshot or an older backup can still keep it.
+   */
+  async deleteMessage(mailbox: string, msg: Message, forEveryone: boolean): Promise<void> {
+    const c = this.state.contacts[mailbox];
+    if (!c || !c.messages.includes(msg)) return;
+    if (!forEveryone) {
+      c.messages.splice(c.messages.indexOf(msg), 1);
+      await this.save();
+      this.changed();
+      return;
+    }
+    if (!msg.out || !msg.id) throw new Error('bad_message');
+    msg.deleted = true;
+    msg.text = '';
+    await this.deliver(mailbox, { k: 'del', id: msg.id });
+  }
+
+  get avatar(): number | undefined {
+    return this.state.avatar;
+  }
+
+  /** Chooses an avatar (null = back to the sigil) and tells every contact, best effort. */
+  async setAvatar(avatar: number | null): Promise<void> {
+    if (avatar !== null && !isAvatar(avatar)) throw new Error('bad_avatar');
+    this.state.avatar = avatar ?? undefined;
+    await this.save();
+    this.changed();
+    for (const mailbox of Object.keys(this.state.contacts)) {
+      await this.deliver(mailbox, { k: 'profile', a: avatar }).catch(() => {});
+    }
+  }
+
+  /** Called with the contact's mailbox whenever a new text message arrives. */
+  onIncoming(fn: (mailbox: string) => void): () => void {
+    this.incoming.add(fn);
+    return () => this.incoming.delete(fn);
+  }
+
+  /** Encrypts a payload for a contact and hands it to the relay. */
+  private async deliver(mailbox: string, payload: object, onFail?: () => void): Promise<void> {
     const list = this.sessions.get(mailbox) ?? [];
     const resync = this.state.resync ?? [];
     if (list.length === 0 || resync.includes(mailbox)) {
@@ -346,10 +421,7 @@ export class Messenger {
       this.sessions.set(mailbox, list);
       this.state.resync = resync.filter((m) => m !== mailbox);
     }
-    const at = Date.now();
-    const enc = list[0].encrypt(pad({ k: 'text', b: body, t: at }));
-    const msg: Message = { out: true, text: body, at };
-    c.messages.push(msg);
+    const enc = list[0].encrypt(pad(payload));
     this.state.unsaved = this.unsaved + 1;
     await this.save(); // persist the advanced ratchet before the message leaves
     this.changed();
@@ -363,7 +435,7 @@ export class Messenger {
     try {
       await this.relay.send(mailbox, JSON.stringify(env));
     } catch (e) {
-      msg.failed = true;
+      onFail?.();
       await this.save();
       this.changed();
       throw e;
@@ -381,12 +453,25 @@ export class Messenger {
     // Blocked senders are not even decrypted, so they can't open a new session either.
     const plain = this.state.blocked?.includes(d.from) ? null : await this.decryptDelivered(d).catch(() => null);
     const c = this.state.contacts[d.from];
+    let isNewText = false;
     if (plain && c) {
       try {
-        const parsed = JSON.parse(fromUtf8(plain)) as { k?: string; b?: unknown };
-        if (parsed.k === 'text' && typeof parsed.b === 'string') {
-          c.messages.push({ out: false, text: parsed.b.slice(0, MAX_TEXT), at: Date.now() });
+        const p = JSON.parse(fromUtf8(plain)) as { k?: unknown; b?: unknown; id?: unknown; a?: unknown };
+        const id = typeof p.id === 'string' && p.id.length <= 32 ? p.id : undefined;
+        const text = typeof p.b === 'string' ? p.b.slice(0, MAX_TEXT) : undefined;
+        if ('a' in p && (p.a === null || isAvatar(p.a))) c.avatar = p.a ?? undefined;
+        // Edits and deletions may only touch messages this same contact sent us.
+        const theirs = id ? c.messages.find((m) => !m.out && m.id === id && !m.deleted) : undefined;
+        if (p.k === 'text' && text) {
+          c.messages.push({ id, out: false, text, at: Date.now() });
           this.state.unsaved = this.unsaved + 1;
+          isNewText = true;
+        } else if (p.k === 'edit' && theirs && text) {
+          theirs.text = text;
+          theirs.edited = true;
+        } else if (p.k === 'del' && theirs) {
+          theirs.deleted = true;
+          theirs.text = '';
         }
       } catch {
         // authenticated but malformed: drop it
@@ -396,6 +481,7 @@ export class Messenger {
     await this.save();
     await this.relay.ack(d.id).catch(() => {});
     this.changed();
+    if (isNewText) for (const fn of this.incoming) fn(d.from);
   }
 
   private async decryptDelivered(d: Delivered): Promise<Uint8Array | null> {

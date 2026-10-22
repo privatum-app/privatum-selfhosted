@@ -170,6 +170,53 @@ test('logout erases the identity from this browser', opts, async () => {
   await assert.rejects(Messenger.unlock('logout passphrase', deps(storage)), { message: 'no_identity' });
 });
 
+test('edit, delete for everyone, avatars and new-message events', opts, async () => {
+  const alice = await Messenger.create('alice passphrase edt', deps());
+  const bob = await Messenger.create('bob passphrase edt', deps());
+  const heard: string[] = [];
+  bob.onIncoming((mb) => heard.push(mb));
+  const fromAlice = () => bob.contact(alice.mailbox)?.messages ?? [];
+  try {
+    await alice.setAvatar(7);
+    await alice.addContact(bob.mailbox, 'Bob');
+    await alice.send(bob.mailbox, 'texto original');
+    await alice.send(bob.mailbox, 'vai sumir');
+    await waitFor(() => fromAlice().length === 2);
+    assert.equal(bob.contact(alice.mailbox)!.avatar, 7, 'avatar travels inside the message');
+    assert.deepEqual(heard, [alice.mailbox, alice.mailbox]);
+
+    const [first, second] = alice.contact(bob.mailbox)!.messages;
+    await alice.editMessage(bob.mailbox, first.id!, 'texto corrigido');
+    await alice.deleteMessage(bob.mailbox, second, true);
+    await waitFor(() => fromAlice()[1].deleted === true);
+    assert.equal(fromAlice()[0].text, 'texto corrigido');
+    assert.equal(fromAlice()[0].edited, true);
+    assert.equal(fromAlice()[1].text, '');
+    assert.equal(heard.length, 2, 'edits and deletions do not count as new messages');
+
+    // Bob tries to edit a message Alice wrote to him: Alice must ignore it.
+    await bob.send(alice.mailbox, 'oi');
+    await waitFor(() => alice.contact(bob.mailbox)!.messages.some((m) => !m.out && m.text === 'oi'));
+    const forged = { k: 'edit', id: first.id, b: 'falsificado' };
+    await (bob as unknown as { deliver(mb: string, p: object): Promise<void> }).deliver(alice.mailbox, forged);
+    await bob.send(alice.mailbox, 'depois');
+    await waitFor(() => alice.contact(bob.mailbox)!.messages.some((m) => m.text === 'depois'));
+    assert.equal(alice.contact(bob.mailbox)!.messages[0].text, 'texto corrigido');
+
+    await alice.setAvatar(null);
+    await waitFor(() => bob.contact(alice.mailbox)!.avatar === undefined);
+    await assert.rejects(alice.setAvatar(99), { message: 'bad_avatar' });
+
+    // "Delete for me" only removes it here.
+    const mine = bob.contact(alice.mailbox)!.messages[0];
+    await bob.deleteMessage(alice.mailbox, mine, false);
+    assert.ok(!bob.contact(alice.mailbox)!.messages.includes(mine));
+  } finally {
+    alice.close();
+    bob.close();
+  }
+});
+
 test('keys swapped by the relay are refused', opts, async () => {
   const bob = await Messenger.create('bob passphrase 789', deps());
   const mallory = await Messenger.create('mallory passphrase', deps());
