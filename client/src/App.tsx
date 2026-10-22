@@ -2,7 +2,7 @@ import { useEffect, useReducer, useRef, useState, type FormEvent, type ReactNode
 import { inviteLink, parseInvite, safetyCode } from './core/identity.ts';
 import { AVATAR_COUNT, KeyMismatchError, Messenger, type Contact, type Deps, type Message } from './core/messenger.ts';
 import { loadOlm, storage } from './platform.ts';
-import { Avatar, Icon, Logo, Modal, Sigil } from './ui.tsx';
+import { AVATAR_NAMES, Avatar, Icon, Logo, Modal, Sigil } from './ui.tsx';
 
 const MIN_PASSPHRASE = 12;
 
@@ -366,7 +366,8 @@ function Chat({
             <button
               key={i}
               className={m.avatar === i ? 'avatar-choice active' : 'avatar-choice'}
-              aria-label={`Avatar ${i + 1}`}
+              aria-label={AVATAR_NAMES[i]}
+              title={AVATAR_NAMES[i]}
               aria-pressed={m.avatar === i}
               onClick={() => {
                 void m.setAvatar(i);

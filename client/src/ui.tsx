@@ -40,32 +40,200 @@ export function Sigil({ seed, size = 40 }: { seed: string; size?: number }) {
   );
 }
 
-// Gallery avatars: 5 shapes x 4 inner patterns, in the brand's black/green/white.
-// Index order is part of the protocol (contacts receive only the index), so only append.
-const SHAPES = [
-  'M24 6a18 18 0 1 1 0 36a18 18 0 1 1 0-36z', // circle
-  'M13 8h22a5 5 0 0 1 5 5v22a5 5 0 0 1-5 5H13a5 5 0 0 1-5-5V13a5 5 0 0 1 5-5z', // rounded square
-  'M24 6l20 34H4z', // triangle
-  'M24 4l20 20-20 20L4 24z', // diamond
-  'M24 5l16.5 9.5v19L24 43 7.5 33.5v-19z', // hexagon
+// Gallery avatars, drawn in the brand palette. The index order is part of the
+// protocol (contacts receive only the index), so new avatars are only appended.
+const G = '#34d399';
+const E = '#10b981';
+const M = '#a7f3d0';
+const W = '#e3ebe6';
+const D = '#0b0f0d';
+const A = '#f59e0b';
+const KEY = 'M183 0a183 183 0 1 1 0 366A183 183 0 1 1 183 0zm0 71a112 112 0 1 0 0 224A112 112 0 1 0 183 71z';
+
+export const AVATAR_NAMES = [
+  'Chave', 'Pinguim', 'Coruja', 'Raposa', 'Gato', 'Panda', 'Coelho', 'Polvo', 'Baleia', 'Fantasma',
+  'Robô', 'Astronauta', 'Alienígena', 'Ninja', 'Foguete', 'Lua', 'Cogumelo', 'Cacto', 'Cebola', 'Cadeado',
 ];
-const FILLS = ['#34d399', '#a7f3d0', '#e3ebe6', '#10b981'];
+
+const ART = [
+  // chave
+  <g key="0" fill={G} transform="translate(17 8.6) scale(0.047)">
+    <path fillRule="evenodd" d={KEY} />
+    <rect x="131" y="296" width="80" height="357" rx="20" />
+    <rect x="180" y="425" width="118" height="75" rx="20" />
+    <rect x="180" y="550" width="118" height="103" rx="20" />
+  </g>,
+  // pinguim
+  <g key="1">
+    <ellipse cx="24" cy="26" rx="12" ry="15" fill={D} stroke={M} strokeWidth="1.5" />
+    <ellipse cx="24" cy="29.5" rx="8" ry="10" fill={W} />
+    <circle cx="20" cy="19.5" r="2.2" fill={W} />
+    <circle cx="28" cy="19.5" r="2.2" fill={W} />
+    <circle cx="20.4" cy="19.8" r="1" fill={D} />
+    <circle cx="27.6" cy="19.8" r="1" fill={D} />
+    <path d="M21.5 23l2.5 3 2.5-3z" fill={A} />
+    <ellipse cx="19.5" cy="40.6" rx="3.2" ry="1.5" fill={A} />
+    <ellipse cx="28.5" cy="40.6" rx="3.2" ry="1.5" fill={A} />
+  </g>,
+  // coruja
+  <g key="2">
+    <path d="M13 17l3-7 5 5zM35 17l-3-7-5 5z" fill={E} />
+    <ellipse cx="24" cy="27" rx="12" ry="13" fill={E} />
+    <ellipse cx="24" cy="31.5" rx="7" ry="7.5" fill={M} />
+    <circle cx="19" cy="21" r="4.6" fill={W} />
+    <circle cx="29" cy="21" r="4.6" fill={W} />
+    <circle cx="19" cy="21" r="2.1" fill={D} />
+    <circle cx="29" cy="21" r="2.1" fill={D} />
+    <path d="M22.5 25l1.5 3 1.5-3z" fill={A} />
+  </g>,
+  // raposa
+  <g key="3">
+    <path d="M11 11l8 7h10l8-7-1 14-12 13-12-13z" fill={A} />
+    <path d="M16.5 26l7.5 10 7.5-10-7.5 3z" fill={W} />
+    <circle cx="19" cy="23" r="1.6" fill={D} />
+    <circle cx="29" cy="23" r="1.6" fill={D} />
+    <circle cx="24" cy="34" r="1.6" fill={D} />
+  </g>,
+  // gato
+  <g key="4">
+    <path d="M13 12l7 6h8l7-6v16a11 11 0 0 1-22 0z" fill={G} />
+    <ellipse cx="19.5" cy="26" rx="1.6" ry="2.4" fill={D} />
+    <ellipse cx="28.5" cy="26" rx="1.6" ry="2.4" fill={D} />
+    <path d="M22.8 30.5h2.4l-1.2 1.5z" fill={D} />
+    <path d="M9 30h7M9 33.5l7-1.5M39 30h-7M39 33.5l-7-1.5" stroke={M} strokeWidth="1.2" strokeLinecap="round" />
+  </g>,
+  // panda
+  <g key="5">
+    <circle cx="15" cy="15" r="5" fill={D} stroke={M} strokeWidth="1" />
+    <circle cx="33" cy="15" r="5" fill={D} stroke={M} strokeWidth="1" />
+    <circle cx="24" cy="26" r="13" fill={W} />
+    <ellipse cx="18.5" cy="25" rx="3.4" ry="4.6" fill={D} transform="rotate(-20 18.5 25)" />
+    <ellipse cx="29.5" cy="25" rx="3.4" ry="4.6" fill={D} transform="rotate(20 29.5 25)" />
+    <circle cx="18.8" cy="24.5" r="1.2" fill={W} />
+    <circle cx="29.2" cy="24.5" r="1.2" fill={W} />
+    <ellipse cx="24" cy="31" rx="2.2" ry="1.5" fill={D} />
+  </g>,
+  // coelho
+  <g key="6">
+    <ellipse cx="19" cy="13" rx="3.2" ry="8" fill={W} />
+    <ellipse cx="29" cy="13" rx="3.2" ry="8" fill={W} />
+    <ellipse cx="19" cy="13" rx="1.4" ry="5.5" fill={M} />
+    <ellipse cx="29" cy="13" rx="1.4" ry="5.5" fill={M} />
+    <circle cx="24" cy="28" r="11" fill={W} />
+    <circle cx="20" cy="26.5" r="1.4" fill={D} />
+    <circle cx="28" cy="26.5" r="1.4" fill={D} />
+    <ellipse cx="24" cy="30.5" rx="1.6" ry="1.1" fill={E} />
+  </g>,
+  // polvo
+  <g key="7">
+    <path d="M12 25a12 12 0 0 1 24 0v5H12z" fill={M} />
+    <path d="M14 29c0 6 1 9 3 10M19.5 29c0 6 1 9 1.5 11M28.5 29c0 6-.5 9-1.5 11M34 29c0 6-1 9-3 10" stroke={M} strokeWidth="3" strokeLinecap="round" fill="none" />
+    <circle cx="19.5" cy="23" r="1.9" fill={D} />
+    <circle cx="28.5" cy="23" r="1.9" fill={D} />
+  </g>,
+  // baleia
+  <g key="8">
+    <path d="M36 26l7-6-1 9z" fill={E} />
+    <path d="M7 27c0-7 7-11 16-11 8 0 14 5 14 11 0 6-7 10-15 10h-9c-3 0-6-4-6-10z" fill={E} />
+    <path d="M12 30c4 3 13 4 20 1" stroke={M} strokeWidth="2" fill="none" strokeLinecap="round" />
+    <circle cx="15" cy="24" r="1.6" fill={D} />
+    <path d="M21 14c0-3-2-5-4-5M21 14c0-3 2-5 4-5" stroke={M} strokeWidth="1.6" fill="none" strokeLinecap="round" />
+  </g>,
+  // fantasma
+  <g key="9">
+    <path d="M13 38V23a11 11 0 0 1 22 0v15l-3.7-3-3.6 3-3.7-3-3.7 3-3.6-3z" fill={W} />
+    <ellipse cx="20" cy="23" rx="1.8" ry="2.6" fill={D} />
+    <ellipse cx="28" cy="23" rx="1.8" ry="2.6" fill={D} />
+    <ellipse cx="24" cy="29" rx="2" ry="1.4" fill={D} />
+  </g>,
+  // robô
+  <g key="10">
+    <path d="M24 9v5" stroke={M} strokeWidth="2" strokeLinecap="round" />
+    <circle cx="24" cy="8.5" r="2" fill={A} />
+    <rect x="12" y="14" width="24" height="21" rx="5" fill={G} />
+    <rect x="9" y="21" width="3" height="8" rx="1.5" fill={E} />
+    <rect x="36" y="21" width="3" height="8" rx="1.5" fill={E} />
+    <circle cx="19" cy="23" r="3" fill={W} />
+    <circle cx="29" cy="23" r="3" fill={W} />
+    <circle cx="19" cy="23" r="1.3" fill={D} />
+    <circle cx="29" cy="23" r="1.3" fill={D} />
+    <rect x="18" y="29" width="12" height="3" rx="1.5" fill={D} />
+  </g>,
+  // astronauta
+  <g key="11">
+    <circle cx="24" cy="24" r="14" fill={W} />
+    <rect x="14" y="16.5" width="20" height="13" rx="6.5" fill={D} />
+    <path d="M18 21a4 4 0 0 1 4-2.2" stroke={G} strokeWidth="2" strokeLinecap="round" fill="none" />
+    <rect x="17" y="33" width="14" height="3.5" rx="1.75" fill={M} />
+  </g>,
+  // alienígena
+  <g key="12">
+    <path d="M24 9c8 0 13 6 13 13 0 8-7 16-13 16S11 30 11 22c0-7 5-13 13-13z" fill={G} />
+    <ellipse cx="18.5" cy="23" rx="4.2" ry="2.6" fill={D} transform="rotate(25 18.5 23)" />
+    <ellipse cx="29.5" cy="23" rx="4.2" ry="2.6" fill={D} transform="rotate(-25 29.5 23)" />
+    <path d="M22 31.5h4" stroke={E} strokeWidth="1.6" strokeLinecap="round" />
+  </g>,
+  // ninja
+  <g key="13">
+    <path d="M36 22l6-3M36 24.5l6 1.5" stroke={G} strokeWidth="2.2" strokeLinecap="round" />
+    <circle cx="24" cy="25" r="13" fill={D} stroke={E} strokeWidth="1.5" />
+    <rect x="12" y="20" width="24" height="7" rx="2" fill={M} />
+    <ellipse cx="19.5" cy="23.5" rx="2" ry="1.3" fill={D} />
+    <ellipse cx="28.5" cy="23.5" rx="2" ry="1.3" fill={D} />
+  </g>,
+  // foguete
+  <g key="14">
+    <path d="M17 24l-5 7v3l6-3zM31 24l5 7v3l-6-3z" fill={G} />
+    <path d="M24 8c6 5 8 12 7 21H17c-1-9 1-16 7-21z" fill={W} />
+    <circle cx="24" cy="19" r="3" fill={G} stroke={D} strokeWidth="1.5" />
+    <path d="M19.5 29h9l-1 4h-7z" fill={E} />
+    <path d="M22 34l2 6 2-6z" fill={A} />
+  </g>,
+  // lua
+  <g key="15">
+    <path d="M30 9a15 15 0 1 0 9 26a12 12 0 1 1-9-26z" fill={M} />
+    <path d="M15 12l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1z" fill={W} />
+    <circle cx="36" cy="14" r="1.2" fill={W} />
+  </g>,
+  // cogumelo
+  <g key="16">
+    <path d="M10 25a14 12 0 0 1 28 0z" fill={G} />
+    <circle cx="18" cy="19" r="2.2" fill={W} />
+    <circle cx="28" cy="17" r="2.6" fill={W} />
+    <circle cx="31.5" cy="22.5" r="1.5" fill={W} />
+    <path d="M19 25h10l-1 11a3 3 0 0 1-3 3h-2a3 3 0 0 1-3-3z" fill={W} />
+    <circle cx="22" cy="30" r="0.9" fill={D} />
+    <circle cx="26" cy="30" r="0.9" fill={D} />
+  </g>,
+  // cacto
+  <g key="17">
+    <path d="M21 25h-4a2 2 0 0 1-2-2v-5M27 22h4a2 2 0 0 0 2-2v-4" stroke={G} strokeWidth="4" strokeLinecap="round" fill="none" />
+    <rect x="21" y="11" width="6" height="24" rx="3" fill={G} />
+    <path d="M15 33h18l-2 7H17z" fill={A} />
+  </g>,
+  // cebola (Tor)
+  <g key="18">
+    <path d="M24 15c0-4 2-7 6-8M24 15c-1-3-3-5-6-5" stroke={E} strokeWidth="2" strokeLinecap="round" fill="none" />
+    <path d="M24 13c7 3 12 8 12 15a12 12 0 0 1-24 0c0-7 5-12 12-15z" fill={G} />
+    <path d="M24 18c4.5 2.5 7.5 6 7.5 10a7.5 7.5 0 0 1-15 0c0-4 3-7.5 7.5-10z" fill="none" stroke={D} strokeWidth="1.8" />
+    <path d="M24 23c2 1.5 3.3 3 3.3 5a3.3 3.3 0 0 1-6.6 0c0-2 1.3-3.5 3.3-5z" fill="none" stroke={D} strokeWidth="1.8" />
+  </g>,
+  // cadeado
+  <g key="19">
+    <path d="M17 21v-4a7 7 0 0 1 14 0v4" stroke={M} strokeWidth="3.5" fill="none" />
+    <rect x="13" y="21" width="22" height="17" rx="4" fill={G} />
+    <circle cx="24" cy="28" r="2.5" fill={D} />
+    <rect x="23" y="29" width="2" height="5" rx="1" fill={D} />
+  </g>,
+];
 
 /** One gallery avatar, or the onion sigil when none was chosen. */
 export function Avatar({ avatar, seed, size = 40 }: { avatar?: number; seed: string; size?: number }) {
-  if (avatar === undefined) return <Sigil seed={seed} size={size} />;
-  const shape = SHAPES[avatar % 5];
-  const pattern = Math.floor(avatar / 5) % 4;
-  const fill = FILLS[(avatar + pattern) % FILLS.length];
+  if (avatar === undefined || !ART[avatar]) return <Sigil seed={seed} size={size} />;
   return (
     <svg className="sigil" width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
       <circle cx="24" cy="24" r="23.5" className="sigil-bg" />
-      <g transform="translate(24 24) scale(0.72) translate(-24 -24)">
-        <path d={shape} fill={pattern === 1 ? 'none' : fill} stroke={fill} strokeWidth={pattern === 1 ? 4 : 0} strokeLinejoin="round" />
-        {pattern === 2 && <circle cx="24" cy="26" r="6" fill="#0b0f0d" />}
-        {pattern === 3 && <path d="M14 26h20M14 32h20" stroke="#0b0f0d" strokeWidth="3.5" strokeLinecap="round" />}
-        {pattern === 1 && <circle cx="24" cy="26" r="4.5" fill={fill} />}
-      </g>
+      {ART[avatar]}
     </svg>
   );
 }
