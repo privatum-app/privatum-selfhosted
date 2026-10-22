@@ -168,14 +168,27 @@ interface Confirmation {
 }
 
 // Short two-note chime built with Web Audio (no audio file to download over Tor).
-// Browsers only allow sound after a user gesture, so the context is created on the first click/key.
+// Browsers only allow sound after a user gesture, so the context is created on the first gesture.
+// Every gesture retries until the context runs: on touch screens only the release
+// (pointerup/touchend) counts as a gesture, so a single pointerdown is not enough.
 let audio: AudioContext | null = null;
+const GESTURES = ['pointerup', 'touchend', 'keydown', 'click'] as const;
 const unlockAudio = () => {
-  audio ??= new AudioContext();
-  void audio.resume();
+  try {
+    audio ??= new AudioContext();
+    void audio.resume().then(() => {
+      if (audio?.state === 'running') GESTURES.forEach((e) => removeEventListener(e, unlockAudio));
+    });
+  } catch {
+    // no Web Audio in this browser: stay silent
+  }
 };
 function chime() {
-  if (!audio || audio.state !== 'running') return;
+  if (!audio) return;
+  if (audio.state !== 'running') {
+    void audio.resume().then(() => audio?.state === 'running' && chime());
+    return;
+  }
   const t = audio.currentTime;
   [880, 1320].forEach((freq, i) => {
     const osc = audio!.createOscillator();
@@ -233,13 +246,16 @@ function Chat({
   mutedRef.current = muted;
   useEffect(() => m.subscribe(rerender), [m]);
   useEffect(() => {
-    addEventListener('pointerdown', unlockAudio, { once: true });
-    addEventListener('keydown', unlockAudio, { once: true });
-    return m.onIncoming((mailbox) => {
+    GESTURES.forEach((e) => addEventListener(e, unlockAudio));
+    const off = m.onIncoming((mailbox) => {
+      if (!mutedRef.current) chime();
       if (!document.hidden && mailbox === selectedRef.current) return;
       setUnread((u) => ({ ...u, [mailbox]: (u[mailbox] ?? 0) + 1 }));
-      if (!mutedRef.current) chime();
     });
+    return () => {
+      off();
+      GESTURES.forEach((e) => removeEventListener(e, unlockAudio));
+    };
   }, [m]);
   // Reading a conversation (and coming back to the tab) clears its counter.
   useEffect(() => {
