@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { inviteLink, parseInvite, safetyCode } from './core/identity.ts';
-import { AVATAR_COUNT, KeyMismatchError, Messenger, type Contact, type Deps, type Message } from './core/messenger.ts';
+import { AVATAR_COUNT, KeyMismatchError, MAX_NAME, Messenger, contactName, defaultName, type Contact, type Deps, type Message } from './core/messenger.ts';
 import { loadOlm, storage } from './platform.ts';
 import { AVATAR_NAMES, Avatar, Icon, Logo, Modal, Sigil } from './ui.tsx';
 
@@ -238,7 +238,7 @@ function Chat({
 }) {
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const [selected, setSelected] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<'invite' | 'add' | 'avatar' | null>(pendingInvite ? 'add' : null);
+  const [dialog, setDialog] = useState<'invite' | 'add' | 'avatar' | 'name' | null>(pendingInvite ? 'add' : null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [muted, setMuted] = useState(readMuted);
   const [unread, setUnread] = useState<Record<string, number>>({});
@@ -329,6 +329,9 @@ function Chat({
             <Avatar avatar={m.avatar} seed={m.mailbox} size={36} />
             <span>Meu avatar</span>
           </button>
+          <button className="me-avatar me-name" onClick={() => setDialog('name')} title="Escolher o nome que seus contatos veem">
+            <span>{m.nick ?? 'Meu nome'}</span>
+          </button>
           <button className="icon-btn" onClick={toggleMuted} title={muted ? 'Ativar som' : 'Silenciar'} aria-label={muted ? 'Ativar som' : 'Silenciar'} aria-pressed={!muted}>
             <Icon name={muted ? 'muted' : 'sound'} />
           </button>
@@ -401,6 +404,9 @@ function Chat({
           Usar o padrão (anéis)
         </button>
       </Modal>
+      <Modal open={dialog === 'name'} onClose={() => setDialog(null)} title="Meu nome">
+        <MyName m={m} onDone={() => setDialog(null)} />
+      </Modal>
       <Modal open={dialog === 'invite'} onClose={() => setDialog(null)} title="Meu convite">
         <MyInvite mailbox={m.mailbox} />
       </Modal>
@@ -447,7 +453,7 @@ function ContactRow({ c, active, unread, onOpen }: { c: Contact; active: boolean
       <Avatar avatar={c.avatar} seed={c.mailbox} size={40} />
       <span className="contact-text">
         <span className="contact-top">
-          <span className="contact-name">{c.name}</span>
+          <span className="contact-name">{contactName(c)}</span>
           {last && <time>{time(last.at)}</time>}
           {unread > 0 && <span className="unread" aria-label={`${unread} novas`}>{unread}</span>}
         </span>
@@ -487,6 +493,35 @@ function MyInvite({ mailbox }: { mailbox: string }) {
   );
 }
 
+function MyName({ m, onDone }: { m: Messenger; onDone: () => void }) {
+  const [name, setName] = useState(m.nick ?? '');
+  const save = (value: string) => {
+    void m.setNick(value);
+    onDone();
+  };
+  return (
+    <form
+      className="stack"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save(name);
+      }}
+    >
+      <p className="muted">O nome que seus contatos veem. Vai cifrado dentro das mensagens; a instância não sabe qual é. Se um contato já deu outro nome a você, o dele prevalece no aparelho dele.</p>
+      <label className="field">
+        <span>Nome</span>
+        <input value={name} maxLength={MAX_NAME} placeholder="Ex.: Ana" onChange={(e) => setName(e.target.value)} />
+      </label>
+      <button className="btn primary">Salvar</button>
+      {m.nick && (
+        <button type="button" className="btn quiet" onClick={() => save('')}>
+          Remover nome
+        </button>
+      )}
+    </form>
+  );
+}
+
 function AddContact({ m, initial, onAdded }: { m: Messenger; initial: string | null; onAdded: (mailbox: string) => void }) {
   const [text, setText] = useState(initial ?? '');
   const [name, setName] = useState('');
@@ -500,7 +535,7 @@ function AddContact({ m, initial, onAdded }: { m: Messenger; initial: string | n
     if (!mailbox) return setError(ERRORS.bad_invite);
     setBusy(true);
     try {
-      await m.addContact(mailbox, name.trim() || `Contato ${mailbox.slice(0, 6)}`);
+      await m.addContact(mailbox, name.trim() || defaultName(mailbox));
       setText('');
       setName('');
       onAdded(mailbox);
@@ -519,7 +554,7 @@ function AddContact({ m, initial, onAdded }: { m: Messenger; initial: string | n
       </label>
       <label className="field">
         <span>Nome do contato</span>
-        <input placeholder="Só aparece neste aparelho" value={name} onChange={(e) => setName(e.target.value)} />
+        <input placeholder="Opcional; sem nome, aparece o que a pessoa escolheu" value={name} onChange={(e) => setName(e.target.value)} />
       </label>
       {error && <p className="notice danger" role="alert">{error}</p>}
       <button className="btn primary" disabled={busy || !text}>{busy ? 'Conferindo as chaves…' : 'Começar conversa'}</button>
@@ -575,7 +610,7 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
         </button>
         <Avatar avatar={c.avatar} seed={c.mailbox} size={40} />
         <div className="conv-title">
-          <h2>{c.name}</h2>
+          <h2>{contactName(c)}</h2>
           <button className={`trust ${trust}`} onClick={() => setShowCode(true)}>
             <Icon name="shield" />
             {c.verified ? 'Código conferido' : 'Conferir código de segurança'}
@@ -591,7 +626,7 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
                 closeMenu(e);
                 onConfirm({
                   title: 'Apagar conversa?',
-                  body: `O histórico com ${c.name} será apagado deste aparelho e não poderá ser recuperado. Se a pessoa escrever de novo, a conversa reaparece.`,
+                  body: `O histórico com ${contactName(c)} será apagado deste aparelho e não poderá ser recuperado. Se a pessoa escrever de novo, a conversa reaparece.`,
                   action: 'Apagar conversa',
                   danger: true,
                   run: async () => {
@@ -608,7 +643,7 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
               onClick={(e) => {
                 closeMenu(e);
                 onConfirm({
-                  title: `Bloquear ${c.name}?`,
+                  title: `Bloquear ${contactName(c)}?`,
                   body: 'A conversa será apagada e tudo o que essa pessoa enviar será descartado sem ser lido. Para desbloquear, adicione o convite dela de novo.',
                   action: 'Bloquear',
                   danger: true,
@@ -743,7 +778,7 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
             <Sigil seed={c.mailbox} size={44} />
           </div>
           <p className="muted">
-            Compare estes números com {c.name} por voz ou pessoalmente. Se forem iguais nos dois aparelhos, ninguém se colocou no meio da
+            Compare estes números com {contactName(c)} por voz ou pessoalmente. Se forem iguais nos dois aparelhos, ninguém se colocou no meio da
             conversa.
           </p>
           <div className="code">

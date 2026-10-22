@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { Messenger, KeyMismatchError, type Deps, type Olm } from '../src/core/messenger.ts';
+import { Messenger, KeyMismatchError, contactName, type Deps, type Olm } from '../src/core/messenger.ts';
 import type { Storage } from '../src/core/vault.ts';
 
 const base = process.env.PRIVATUM_TEST_BASE;
@@ -170,7 +170,7 @@ test('logout erases the identity from this browser', opts, async () => {
   await assert.rejects(Messenger.unlock('logout passphrase', deps(storage)), { message: 'no_identity' });
 });
 
-test('edit, delete for everyone, avatars and new-message events', opts, async () => {
+test('edit, delete for everyone, avatars, names and new-message events', opts, async () => {
   const alice = await Messenger.create('alice passphrase edt', deps());
   const bob = await Messenger.create('bob passphrase edt', deps());
   const heard: string[] = [];
@@ -206,6 +206,17 @@ test('edit, delete for everyone, avatars and new-message events', opts, async ()
     await alice.setAvatar(null);
     await waitFor(() => bob.contact(alice.mailbox)!.avatar === undefined);
     await assert.rejects(alice.setAvatar(99), { message: 'bad_avatar' });
+
+    // Display names: shown only where nobody typed a name, cleaned of control/bidi characters.
+    await alice.setNick('  Ana\u202e\u0007 ');
+    await bob.setNick('Banco Oficial');
+    await waitFor(() => bob.contact(alice.mailbox)!.nick === 'Ana');
+    assert.equal(contactName(bob.contact(alice.mailbox)!), 'Ana', 'alice wrote first: her name shows');
+    await waitFor(() => alice.contact(bob.mailbox)!.nick === 'Banco Oficial');
+    assert.equal(contactName(alice.contact(bob.mailbox)!), 'Bob', 'the name alice typed wins');
+    await alice.setNick('');
+    await waitFor(() => bob.contact(alice.mailbox)!.nick === undefined);
+    assert.equal(contactName(bob.contact(alice.mailbox)!), `Contato ${alice.mailbox.slice(0, 6)}`);
 
     // "Delete for me" only removes it here.
     const mine = bob.contact(alice.mailbox)!.messages[0];

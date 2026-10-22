@@ -45,6 +45,17 @@ export interface Message {
 export const AVATAR_COUNT = 20;
 const isAvatar = (x: unknown): x is number => Number.isInteger(x) && (x as number) >= 0 && (x as number) < AVATAR_COUNT;
 
+/** Longest display name a contact may send; longer names are cut. */
+export const MAX_NAME = 32;
+// Control and format characters (bidi overrides included) are stripped so a name can't disguise itself.
+const cleanName = (x: unknown) => (typeof x === 'string' ? x.replace(/[\p{Cc}\p{Cf}]/gu, '').trim().slice(0, MAX_NAME) || undefined : undefined);
+
+/** Name given to a contact when nobody typed one. */
+export const defaultName = (mailbox: string) => `Contato ${mailbox.slice(0, 6)}`;
+
+/** The name we typed wins; otherwise the name the contact chose; otherwise the default. */
+export const contactName = (c: Contact) => (c.nick && c.name === defaultName(c.mailbox) ? c.nick : c.name);
+
 export interface Contact {
   mailbox: string;
   ed25519: string;
@@ -56,6 +67,8 @@ export interface Contact {
   messages: Message[];
   /** Avatar index the contact chose (sent to us encrypted); none means the sigil. */
   avatar?: number;
+  /** Display name the contact chose (sent to us encrypted). */
+  nick?: string;
 }
 
 interface Saved {
@@ -72,6 +85,8 @@ interface Saved {
   blocked?: string[];
   /** Our own avatar index, shared with contacts inside encrypted messages. */
   avatar?: number;
+  /** Our own display name, shared with contacts inside encrypted messages. */
+  nick?: string;
 }
 
 const BACKUP_FORMAT = 'privatum-backup';
@@ -356,7 +371,7 @@ export class Messenger {
     const id = b64(crypto.getRandomValues(new Uint8Array(9)));
     const msg: Message = { id, out: true, text: body, at };
     c.messages.push(msg);
-    await this.deliver(mailbox, { k: 'text', id, b: body, t: at, a: this.state.avatar }, () => {
+    await this.deliver(mailbox, { k: 'text', id, b: body, t: at, ...this.profile() }, () => {
       msg.failed = true;
     });
   }
@@ -395,14 +410,32 @@ export class Messenger {
     return this.state.avatar;
   }
 
+  get nick(): string | undefined {
+    return this.state.nick;
+  }
+
   /** Chooses an avatar (null = back to the sigil) and tells every contact, best effort. */
   async setAvatar(avatar: number | null): Promise<void> {
     if (avatar !== null && !isAvatar(avatar)) throw new Error('bad_avatar');
     this.state.avatar = avatar ?? undefined;
+    await this.shareProfile();
+  }
+
+  /** Chooses the name contacts see (empty = none) and tells every contact, best effort. */
+  async setNick(nick: string): Promise<void> {
+    this.state.nick = cleanName(nick);
+    await this.shareProfile();
+  }
+
+  private profile() {
+    return { a: this.state.avatar ?? null, n: this.state.nick ?? null };
+  }
+
+  private async shareProfile() {
     await this.save();
     this.changed();
     for (const mailbox of Object.keys(this.state.contacts)) {
-      await this.deliver(mailbox, { k: 'profile', a: avatar }).catch(() => {});
+      await this.deliver(mailbox, { k: 'profile', ...this.profile() }).catch(() => {});
     }
   }
 
@@ -456,10 +489,11 @@ export class Messenger {
     let isNewText = false;
     if (plain && c) {
       try {
-        const p = JSON.parse(fromUtf8(plain)) as { k?: unknown; b?: unknown; id?: unknown; a?: unknown };
+        const p = JSON.parse(fromUtf8(plain)) as { k?: unknown; b?: unknown; id?: unknown; a?: unknown; n?: unknown };
         const id = typeof p.id === 'string' && p.id.length <= 32 ? p.id : undefined;
         const text = typeof p.b === 'string' ? p.b.slice(0, MAX_TEXT) : undefined;
         if ('a' in p && (p.a === null || isAvatar(p.a))) c.avatar = p.a ?? undefined;
+        if ('n' in p && (p.n === null || typeof p.n === 'string')) c.nick = cleanName(p.n);
         // Edits and deletions may only touch messages this same contact sent us.
         const theirs = id ? c.messages.find((m) => !m.out && m.id === id && !m.deleted) : undefined;
         if (p.k === 'text' && text) {
@@ -516,7 +550,7 @@ export class Messenger {
       mailbox,
       ed25519: env.from_ed25519,
       curve25519: env.from_curve25519,
-      name: `Contato ${mailbox.slice(0, 6)}`,
+      name: defaultName(mailbox),
       addedByMe: false,
       verified: false,
       messages: [],

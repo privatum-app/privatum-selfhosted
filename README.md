@@ -124,11 +124,12 @@ O backup é cifrado com a sua senha local; quem tiver o arquivo pode tentar adiv
 - **Apagar conversa:** remove o contato e o histórico só deste aparelho. Se a pessoa escrever de novo, a conversa reaparece como "não verificada", sem o histórico antigo.
 - **Bloquear:** apaga a conversa e descarta, sem ler, tudo o que essa pessoa enviar. Para desbloquear, adicione o convite dela de novo. O bloqueio é local: a instância continua aceitando as mensagens dela e o seu aparelho as descarta.
 
-### Editar, apagar, avatar e som
+### Editar, apagar, avatar, nome e som
 
 - **Toque numa mensagem** para ver as ações. Nas suas: **Editar** e **Apagar para todos**; em qualquer uma: **Apagar para mim**. "Apagar para todos" é um pedido ao aparelho do contato: não garante que ele não viu, não fez captura de tela nem guarda um backup anterior.
-- **Meu avatar:** escolha um dos 20 emblemas. Ele vai cifrado dentro das mensagens; a instância não sabe qual você usa. Fotos não são aceitas, de propósito (fotos de celular carregam localização e outros metadados).
-- **Som:** um aviso curto quando chega mensagem de outra conversa ou com a aba em segundo plano; o título da aba mostra o total de mensagens novas. O ícone de alto-falante silencia.
+- **Meu avatar:** escolha um dos 20 desenhos (chave do Privatum, pinguim, cebola do Tor e outros). Ele vai cifrado dentro das mensagens; a instância não sabe qual você usa. Fotos não são aceitas, de propósito (fotos de celular carregam localização e outros metadados).
+- **Meu nome:** o nome que seus contatos veem, também cifrado. Ele aparece no aparelho do contato só se ele não deu outro nome a você ao adicionar o convite; o nome que cada pessoa digita sempre prevalece, para que ninguém se passe por outro contato trocando o próprio nome.
+- **Som:** um aviso curto a cada mensagem nova; o título da aba mostra o total de mensagens não lidas. O navegador só libera som depois de um clique, e o clique em "Desbloquear" já conta. O ícone de alto-falante silencia. No Android, com o Tor Browser em segundo plano ou a tela apagada, o sistema pausa a página e não há som.
 
 Não existe "sala" com prazo: a instância fica no ar enquanto quem hospeda mantiver os contêineres rodando, e cada pessoa decide o que guarda no próprio aparelho.
 
