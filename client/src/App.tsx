@@ -8,6 +8,8 @@ import {
   MAX_GROUP_NAME,
   MAX_NAME,
   Messenger,
+  REACTIONS,
+  TIMERS,
   contactName,
   defaultName,
   type Contact,
@@ -35,7 +37,7 @@ const ERRORS: Record<string, string> = {
   registration_closed: 'Esta instância não está aceitando pessoas novas.',
   bad_group_name: 'Dê um nome ao grupo.',
   bad_group_members: `Escolha de 1 a ${MAX_GROUP - 1} contatos.`,
-  not_owner: 'Só quem criou o grupo muda os membros.',
+  not_owner: 'Só quem criou o grupo muda isso.',
 };
 
 const describe = (e: unknown) => {
@@ -48,6 +50,20 @@ const describe = (e: unknown) => {
 };
 
 const time = (at: number) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+const TIMER_LABELS: Record<number, string> = { 0: 'Desligadas', 3600: '1 hora', 86_400: '1 dia', 604_800: '7 dias' };
+
+/** One line for a timer notice, e.g. "Você ativou as mensagens temporárias (1 dia)". */
+const timerNotice = (who: string, timer: number) =>
+  timer ? `${who} ativou as mensagens temporárias (${TIMER_LABELS[timer]})` : `${who} desligou as mensagens temporárias`;
+
+/** Sidebar preview of a thread's last message. */
+function preview(last: Message | undefined, who: string, empty: string) {
+  if (!last) return empty;
+  if (last.info) return timerNotice(who, last.info.timer);
+  if (last.deleted) return 'Mensagem apagada';
+  return who ? `${who}: ${last.text}` : last.text;
+}
 
 export function App() {
   const [deps, setDeps] = useState<Deps | null>(null);
@@ -512,7 +528,7 @@ function ContactRow({ c, active, unread, onOpen }: { c: Contact; active: boolean
         </span>
         <span className="contact-preview">
           {!c.verified && !c.addedByMe ? <span className="tag warn">não verificado</span> : c.verified && <span className="tag ok">verificado</span>}
-          <span className="preview-text">{last ? (last.deleted ? 'Mensagem apagada' : `${last.out ? 'Você: ' : ''}${last.text}`) : 'Sem mensagens'}</span>
+          <span className="preview-text">{preview(last, last?.out ? 'Você' : last?.info ? contactName(c) : '', 'Sem mensagens')}</span>
         </span>
       </span>
     </button>
@@ -540,7 +556,7 @@ function GroupRow({ m, g, active, unread, onOpen }: { m: Messenger; g: Group; ac
         </span>
         <span className="contact-preview">
           {g.left && <span className="tag warn">fora do grupo</span>}
-          <span className="preview-text">{last ? (last.deleted ? 'Mensagem apagada' : `${who}: ${last.text}`) : `${g.members.length} pessoas`}</span>
+          <span className="preview-text">{preview(last, who ?? '', `${g.members.length} pessoas`)}</span>
         </span>
       </span>
     </button>
@@ -593,6 +609,52 @@ function GroupForm({ m, group, onSave }: { m: Messenger; group?: Group; onSave: 
       {error && <p className="notice danger" role="alert">{error}</p>}
       <button className="btn primary" disabled={busy}>{busy ? 'Avisando os membros…' : group ? 'Salvar membros' : 'Criar grupo'}</button>
     </form>
+  );
+}
+
+function TimerTag({ timer }: { timer?: number }) {
+  if (!timer) return null;
+  return (
+    <span className="timer-tag" title={`Mensagens temporárias: ${TIMER_LABELS[timer]}`}>
+      <Icon name="timer" /> {TIMER_LABELS[timer]}
+    </span>
+  );
+}
+
+function TimerDialog({ m, threadKey, timer, open, onClose }: { m: Messenger; threadKey: string; timer?: number; open: boolean; onClose: () => void }) {
+  const [error, setError] = useState('');
+  return (
+    <Modal open={open} onClose={onClose} title="Mensagens temporárias">
+      <div className="stack">
+        <p className="muted">
+          As mensagens novas somem dos aparelhos de todos depois do prazo. Não impede captura de tela nem cópias em backups feitos antes. A cópia
+          cifrada que ainda não foi entregue fica na instância até ser entregue (no máximo 14 dias).
+        </p>
+        <div className="modes">
+          {TIMERS.map((t) => (
+            <label key={t} className={`mode ${(timer ?? 0) === t ? 'active' : ''}`}>
+              <input
+                type="radio"
+                name="timer"
+                value={t}
+                checked={(timer ?? 0) === t}
+                onChange={() =>
+                  m.setTimer(threadKey, t).then(
+                    () => {
+                      setError('');
+                      onClose();
+                    },
+                    (e) => setError(describe(e)),
+                  )
+                }
+              />
+              <span>{TIMER_LABELS[t]}</span>
+            </label>
+          ))}
+        </div>
+        {error && <p className="notice danger" role="alert">{error}</p>}
+      </div>
+    </Modal>
   );
 }
 
@@ -718,6 +780,7 @@ function closeMenu(e: { currentTarget: Element }) {
 function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; onBack: () => void; onConfirm: (x: Confirmation) => void }) {
   const [code, setCode] = useState('');
   const [showCode, setShowCode] = useState(false);
+  const [showTimer, setShowTimer] = useState(false);
 
   useEffect(() => {
     safetyCode(m.mailbox, c.mailbox).then(setCode);
@@ -732,7 +795,10 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
         </button>
         <Avatar avatar={c.avatar} seed={c.mailbox} size={40} />
         <div className="conv-title">
-          <h2>{contactName(c)}</h2>
+          <h2>
+            {contactName(c)}
+            <TimerTag timer={c.timer} />
+          </h2>
           <button className={`trust ${trust}`} onClick={() => setShowCode(true)}>
             <Icon name="shield" />
             {c.verified ? 'Código conferido' : 'Conferir código de segurança'}
@@ -743,6 +809,14 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
             <Icon name="more" />
           </summary>
           <div className="menu-list">
+            <button
+              onClick={(e) => {
+                closeMenu(e);
+                setShowTimer(true);
+              }}
+            >
+              Mensagens temporárias
+            </button>
             <button
               onClick={(e) => {
                 closeMenu(e);
@@ -789,7 +863,15 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
         </p>
       )}
 
-      <Thread m={m} threadKey={c.mailbox} messages={c.messages} others="no aparelho do contato" onConfirm={onConfirm} />
+      <Thread
+        m={m}
+        threadKey={c.mailbox}
+        messages={c.messages}
+        nameOf={(mb) => (mb === m.mailbox ? 'Você' : contactName(c))}
+        others="no aparelho do contato"
+        onConfirm={onConfirm}
+      />
+      <TimerDialog m={m} threadKey={c.mailbox} timer={c.timer} open={showTimer} onClose={() => setShowTimer(false)} />
 
       <Modal open={showCode} onClose={() => setShowCode(false)} title="Código de segurança">
         <div className="stack">
@@ -819,6 +901,7 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
 function GroupConversation({ m, g, onBack, onConfirm }: { m: Messenger; g: Group; onBack: () => void; onConfirm: (x: Confirmation) => void }) {
   const [showMembers, setShowMembers] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [showTimer, setShowTimer] = useState(false);
   const owner = g.owner === m.mailbox && !g.left;
   return (
     <>
@@ -828,7 +911,10 @@ function GroupConversation({ m, g, onBack, onConfirm }: { m: Messenger; g: Group
         </button>
         <GroupAvatar size={40} />
         <div className="conv-title">
-          <h2>{g.name}</h2>
+          <h2>
+            {g.name}
+            <TimerTag timer={g.timer} />
+          </h2>
           <button className="trust neutral" onClick={() => setShowMembers(true)}>
             <Icon name="group" />
             {g.members.length} {g.members.length === 1 ? 'pessoa' : 'pessoas'}
@@ -847,6 +933,16 @@ function GroupConversation({ m, g, onBack, onConfirm }: { m: Messenger; g: Group
             >
               Membros
             </button>
+            {owner && (
+              <button
+                onClick={(e) => {
+                  closeMenu(e);
+                  setShowTimer(true);
+                }}
+              >
+                Mensagens temporárias
+              </button>
+            )}
             {!g.left && (
               <button
                 onClick={(e) => {
@@ -894,10 +990,12 @@ function GroupConversation({ m, g, onBack, onConfirm }: { m: Messenger; g: Group
         threadKey={GROUP_PREFIX + g.id}
         messages={g.messages}
         readOnly={g.left}
-        senderName={(mb) => memberName(m, mb)}
+        group
+        nameOf={(mb) => memberName(m, mb)}
         others="nos aparelhos dos membros"
         onConfirm={onConfirm}
       />
+      <TimerDialog m={m} threadKey={GROUP_PREFIX + g.id} timer={g.timer} open={showTimer} onClose={() => setShowTimer(false)} />
 
       <Modal
         open={showMembers}
@@ -949,7 +1047,8 @@ function Thread({
   threadKey,
   messages,
   readOnly,
-  senderName,
+  group,
+  nameOf,
   others,
   onConfirm,
 }: {
@@ -957,8 +1056,10 @@ function Thread({
   threadKey: string;
   messages: Message[];
   readOnly?: boolean;
-  /** Groups: label incoming messages with their sender. */
-  senderName?: (mailbox: string) => string;
+  /** Groups label incoming messages with their sender. */
+  group?: boolean;
+  /** Display name for a mailbox in this thread (us included). */
+  nameOf: (mailbox: string) => string;
   /** Where "delete for everyone" also deletes, for the confirmation text. */
   others: string;
   onConfirm: (x: Confirmation) => void;
@@ -967,7 +1068,9 @@ function Thread({
   const [error, setError] = useState('');
   const [actionsFor, setActionsFor] = useState<Message | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
   const end = useRef<HTMLDivElement>(null);
+  const authorOf = (msg: Message) => (msg.out ? m.mailbox : (msg.from ?? threadKey));
 
   // Braces matter: newer browsers return a Promise from scrollIntoView, which
   // React would then try to call as the effect's cleanup.
@@ -981,11 +1084,13 @@ function Thread({
     setError('');
     const t = text;
     const target = editing;
+    const answering = replyTo;
     setText('');
     setEditing(null);
+    setReplyTo(null);
     try {
       if (target?.id) await m.editMessage(threadKey, target.id, t);
-      else await m.send(threadKey, t);
+      else await m.send(threadKey, t, answering ?? undefined);
     } catch (err) {
       setError(describe(err));
     }
@@ -997,27 +1102,90 @@ function Thread({
         {messages.length === 0 && (
           <p className="muted messages-empty">Nenhuma mensagem ainda. Tudo o que você escrever é cifrado antes de sair deste navegador.</p>
         )}
-        {messages.map((msg, i) => (
+        {messages.map((msg, i) => {
+          if (msg.info) {
+            return (
+              <p key={i} className="info-line">
+                <Icon name="timer" /> {timerNotice(nameOf(msg.info.by), msg.info.timer)}
+              </p>
+            );
+          }
+          const quoted = msg.reply && m.quoted(threadKey, msg);
+          const mine = msg.reactions?.[m.mailbox];
+          const counts = Object.values(msg.reactions ?? {}).reduce<Record<string, number>>((acc, e) => ({ ...acc, [e]: (acc[e] ?? 0) + 1 }), {});
+          return (
           <div key={i} className={msg.out ? 'msg out' : 'msg in'}>
             <button
               className={msg.out ? 'bubble out' : 'bubble in'}
               aria-expanded={actionsFor === msg}
               onClick={() => setActionsFor(actionsFor === msg ? null : msg)}
             >
-              {senderName && !msg.out && msg.from && <span className="sender">{senderName(msg.from)}</span>}
+              {group && !msg.out && msg.from && <span className="sender">{nameOf(msg.from)}</span>}
+              {msg.reply && (
+                <span className="quote">
+                  {quoted ? (
+                    <>
+                      <strong>{nameOf(authorOf(quoted))}</strong>
+                      <span>{quoted.deleted ? 'Mensagem apagada' : quoted.text}</span>
+                    </>
+                  ) : (
+                    <span>Mensagem original indisponível</span>
+                  )}
+                </span>
+              )}
               {msg.deleted ? <span className="bubble-text deleted">Mensagem apagada</span> : <span className="bubble-text">{msg.text}</span>}
               <time>
+                {msg.exp && <Icon name="timer" />}
                 {time(msg.at)}
                 {msg.edited && !msg.deleted ? ' · editada' : ''}
-                {msg.failed ? (senderName ? ' · não chegou a todos' : ' · não enviada') : ''}
+                {msg.failed ? (group ? ' · não chegou a todos' : ' · não enviada') : ''}
               </time>
             </button>
+            {Object.keys(counts).length > 0 && (
+              <div className="reactions">
+                {Object.entries(counts).map(([e, n]) => (
+                  <span key={e} className={mine === e ? 'reaction mine' : 'reaction'}>
+                    {e}
+                    {n > 1 && <small>{n}</small>}
+                  </span>
+                ))}
+              </div>
+            )}
             {actionsFor === msg && (
               <div className="msg-actions">
+                {msg.id && !msg.deleted && !readOnly && (
+                  <div className="react-picker" role="group" aria-label="Reagir">
+                    {REACTIONS.map((e) => (
+                      <button
+                        key={e}
+                        className={mine === e ? 'mine' : undefined}
+                        aria-pressed={mine === e}
+                        onClick={() => {
+                          setActionsFor(null);
+                          m.react(threadKey, msg, mine === e ? null : e).catch((err) => setError(describe(err)));
+                        }}
+                      >
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {msg.id && !msg.deleted && !readOnly && (
+                  <button
+                    onClick={() => {
+                      setReplyTo(msg);
+                      setEditing(null);
+                      setActionsFor(null);
+                    }}
+                  >
+                    Responder
+                  </button>
+                )}
                 {msg.out && msg.id && !msg.deleted && !readOnly && (
                   <button
                     onClick={() => {
                       setEditing(msg);
+                      setReplyTo(null);
                       setText(msg.text);
                       setActionsFor(null);
                     }}
@@ -1059,11 +1227,22 @@ function Thread({
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
         <div ref={end} />
       </div>
 
       {error && <p className="notice danger composer-error" role="alert">{error}</p>}
+      {replyTo && (
+        <div className="editing-bar">
+          <span className="reply-preview">
+            Respondendo a <strong>{nameOf(authorOf(replyTo))}</strong>: {replyTo.text}
+          </span>
+          <button className="link" onClick={() => setReplyTo(null)}>
+            Cancelar
+          </button>
+        </div>
+      )}
       {editing && (
         <div className="editing-bar">
           <span>Editando mensagem</span>

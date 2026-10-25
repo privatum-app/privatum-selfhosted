@@ -226,3 +226,21 @@ h1, h2, p { margin: 0; }
 .pick legend { color: var(--muted); font-size: 0.9rem; padding: 0 0.25rem; }
 .member-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
 .member-list li { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+
+/* Replies, reactions, disappearing messages */
+.quote { display: grid; gap: 0.1rem; margin-bottom: 0.3rem; padding: 0.35rem 0.55rem; border-left: 3px solid var(--accent); border-radius: 6px; background: rgb(0 0 0 / 0.18); font-size: 0.82rem; text-align: left; }
+.quote span { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--muted); }
+.reactions { display: flex; gap: 0.25rem; margin-top: -0.2rem; }
+.msg.out .reactions { justify-content: flex-end; }
+.reaction { display: inline-flex; align-items: center; gap: 0.15rem; padding: 0.05rem 0.4rem; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); font-size: 0.85rem; }
+.reaction.mine { border-color: var(--accent); }
+.reaction small { color: var(--muted); font-size: 0.72rem; }
+.react-picker { display: flex; gap: 0.15rem; }
+.react-picker button { font-size: 1.15rem; padding: 0.2rem 0.35rem; border-radius: 8px; }
+.react-picker button.mine { background: var(--line); }
+.info-line { align-self: center; display: inline-flex; align-items: center; gap: 0.35rem; color: var(--muted); font-size: 0.8rem; padding: 0.3rem 0.7rem; border-radius: 999px; background: var(--panel); }
+.info-line .icon-svg, .bubble time .icon-svg { width: 14px; height: 14px; }
+.bubble time .icon-svg { vertical-align: -2px; margin-right: 0.2rem; }
+.timer-tag { display: inline-flex; align-items: center; gap: 0.2rem; margin-left: 0.5rem; color: var(--muted); font-size: 0.75rem; font-weight: 500; vertical-align: middle; }
+.timer-tag .icon-svg { width: 14px; height: 14px; }
+.reply-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

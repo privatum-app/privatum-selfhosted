@@ -42,6 +42,26 @@ export interface Message {
   deleted?: boolean;
   /** Sender of an incoming group message. */
   from?: string;
+  /** Disappearing message: removed from this device at this time (ms). */
+  exp?: number;
+  /** The message this one answers: its id and its author's mailbox. Only the reference travels. */
+  reply?: { id: string; by: string };
+  /** Reaction per person (mailbox -> one of REACTIONS). */
+  reactions?: Record<string, string>;
+  /** A notice instead of a text: someone changed the disappearing timer. */
+  info?: { timer: number; by: string };
+}
+
+/** Reactions are a fixed set, so nobody can send arbitrary text as one. */
+export const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+/** Disappearing-message timers offered (seconds; 0 = off). */
+export const TIMERS = [0, 3600, 86_400, 7 * 86_400];
+
+/** What contacts and groups have in common: a history and an optional timer. */
+interface Thread {
+  messages: Message[];
+  /** Disappearing-message timer in seconds. */
+  timer?: number;
 }
 
 /**
@@ -49,7 +69,7 @@ export interface Message {
  * for every member over the usual pairwise sessions, so the relay sees ordinary
  * one-to-one messages. Only the creator (owner) changes the member list.
  */
-export interface Group {
+export interface Group extends Thread {
   id: string;
   name: string;
   owner: string;
@@ -82,7 +102,7 @@ export const defaultName = (mailbox: string) => `Contato ${mailbox.slice(0, 6)}`
 /** The name we typed wins; otherwise the name the contact chose; otherwise the default. */
 export const contactName = (c: Contact) => (c.nick && c.name === defaultName(c.mailbox) ? c.nick : c.name);
 
-export interface Contact {
+export interface Contact extends Thread {
   mailbox: string;
   ed25519: string;
   curve25519: string;
@@ -132,7 +152,17 @@ interface Payload {
   /** ginfo: group name and member list. */
   name?: unknown;
   m?: unknown;
+  /** text: disappearing timer of the sender (seconds). timer: the new timer. */
+  x?: unknown;
+  s?: unknown;
+  /** text: quoted message reference. react: author of the target message. */
+  q?: unknown;
+  by?: unknown;
+  /** react: the reaction, or null to remove ours. */
+  e?: unknown;
 }
+
+const isTimer = (x: unknown): x is number => TIMERS.includes(x as number);
 const saltBytes = (salt: string) => Uint8Array.from(atob(salt), (c) => c.charCodeAt(0));
 
 interface Envelope {
@@ -178,6 +208,7 @@ export class Messenger {
   private socket: WebSocket | null = null;
   private stopped = false;
   private listeners = new Set<() => void>();
+  private sweeper: ReturnType<typeof setInterval> | undefined;
   private incoming = new Set<(mailbox: string) => void>();
   readonly relay: Relay;
 
@@ -320,6 +351,11 @@ export class Messenger {
 
   /** Registers (idempotent; skipped when the caller just did it), tops up one-time keys and opens the inbox. */
   private async connect(registered = false) {
+    // Messages that expired while the app was closed go before anything is shown.
+    if (this.sweep()) await this.save();
+    this.sweeper ??= setInterval(() => {
+      if (this.sweep()) this.save().then(() => this.changed());
+    }, 15_000);
     if (!registered) await this.relay.register(this.account.ed25519, this.account.curve25519);
     await this.publishKeys();
     await this.openInbox();
@@ -356,6 +392,7 @@ export class Messenger {
 
   close() {
     this.stopped = true;
+    clearInterval(this.sweeper);
     this.socket?.close();
   }
 
@@ -431,13 +468,31 @@ export class Messenger {
   }
 
   /** A contact's mailbox or GROUP_PREFIX + group id: its messages and who receives them. */
-  private thread(key: string): { messages: Message[]; to: string[]; g?: string } | undefined {
+  private thread(key: string): { messages: Message[]; to: string[]; g?: string; obj: Contact | Group } | undefined {
     if (key.startsWith(GROUP_PREFIX)) {
       const g = this.state.groups?.[key.slice(GROUP_PREFIX.length)];
-      return g && { messages: g.messages, to: g.left ? [] : this.othersIn(g), g: g.id };
+      return g && { messages: g.messages, to: g.left ? [] : this.othersIn(g), g: g.id, obj: g };
     }
     const c = this.state.contacts[key];
-    return c && { messages: c.messages, to: [key] };
+    return c && { messages: c.messages, to: [key], obj: c };
+  }
+
+  /** Who wrote `msg` in the thread `key`: us, the group member, or the contact. */
+  private author(key: string, msg: Message): string {
+    return msg.out ? this.mailbox : (msg.from ?? key);
+  }
+
+  /** Finds a message by id and author, as a reply or reaction names it. */
+  private findBy(messages: Message[], id: string, by: string, contact?: string): Message | undefined {
+    return messages.find(
+      (m) => m.id === id && !m.info && (by === this.mailbox ? m.out : !m.out && (m.from ?? contact) === by),
+    );
+  }
+
+  /** The message a reply points to, if it is still on this device. */
+  quoted(key: string, msg: Message): Message | undefined {
+    const t = this.thread(key);
+    return t && msg.reply ? this.findBy(t.messages, msg.reply.id, msg.reply.by, key) : undefined;
   }
 
   private othersIn(g: Group): string[] {
@@ -457,17 +512,54 @@ export class Messenger {
     this.changed();
   }
 
-  async send(key: string, text: string): Promise<void> {
+  async send(key: string, text: string, replyTo?: Message): Promise<void> {
     const t = this.thread(key);
     const body = text.trim();
     if (!t || (t.g !== undefined && this.group(t.g)?.left) || !body || body.length > MAX_TEXT) throw new Error('bad_message');
     const at = Date.now();
     const id = b64(crypto.getRandomValues(new Uint8Array(9)));
-    const msg: Message = { id, out: true, text: body, at };
+    const timer = t.obj.timer ?? 0;
+    const reply = replyTo?.id && t.messages.includes(replyTo) ? { id: replyTo.id, by: this.author(key, replyTo) } : undefined;
+    const msg: Message = { id, out: true, text: body, at, reply, exp: timer ? at + timer * 1000 : undefined };
     t.messages.push(msg);
-    await this.fanout(t, { k: 'text', id, b: body, t: at, ...this.profile() }, () => {
+    await this.fanout(t, { k: 'text', id, b: body, t: at, x: timer || undefined, q: reply, ...this.profile() }, () => {
       msg.failed = true;
     });
+  }
+
+  /** Sets (or with null removes) our reaction to a message, here and for the others. */
+  async react(key: string, msg: Message, emoji: string | null): Promise<void> {
+    const t = this.thread(key);
+    if (!t || !msg.id || msg.deleted || msg.info || !t.messages.includes(msg)) return;
+    if (emoji !== null && !REACTIONS.includes(emoji)) throw new Error('bad_reaction');
+    const reactions = (msg.reactions ??= {});
+    if (emoji === null) delete reactions[this.mailbox];
+    else reactions[this.mailbox] = emoji;
+    await this.fanout(t, { k: 'react', id: msg.id, by: this.author(key, msg), e: emoji });
+  }
+
+  /** Disappearing messages for this conversation; in a group, only its owner sets it. */
+  async setTimer(key: string, seconds: number): Promise<void> {
+    const t = this.thread(key);
+    if (!t || !isTimer(seconds)) throw new Error('bad_timer');
+    if (t.g !== undefined && (this.group(t.g)!.owner !== this.mailbox || this.group(t.g)!.left)) throw new Error('not_owner');
+    t.obj.timer = seconds || undefined;
+    t.messages.push({ out: true, text: '', at: Date.now(), info: { timer: seconds, by: this.mailbox } });
+    await this.fanout(t, { k: 'timer', s: seconds });
+  }
+
+  /** Removes disappearing messages whose time has come; returns true if any went. */
+  private sweep(): boolean {
+    const now = Date.now();
+    let removed = false;
+    for (const t of [...Object.values(this.state.contacts), ...this.groups]) {
+      const kept = t.messages.filter((m) => !m.exp || m.exp > now);
+      if (kept.length !== t.messages.length) {
+        t.messages = kept;
+        removed = true;
+      }
+    }
+    return removed;
   }
 
   /** Edits one of our own messages here and on the other devices. */
@@ -641,23 +733,13 @@ export class Messenger {
         const text = typeof p.b === 'string' ? p.b.slice(0, MAX_TEXT) : undefined;
         if ('a' in p && (p.a === null || isAvatar(p.a))) c.avatar = p.a ?? undefined;
         if ('n' in p && (p.n === null || typeof p.n === 'string')) c.nick = cleanName(p.n);
-        // Edits and deletions may only touch messages this same contact sent us.
-        const theirs = id ? c.messages.find((m) => !m.out && m.id === id && !m.deleted) : undefined;
         if (typeof p.g === 'string' && p.g.length <= 32) {
           // Someone who reaches us only through a group is not listed as a contact.
           if (!wasKnown) c.hidden = true;
           if (this.receiveGroup(d.from, p.g, p, id, text)) newIn = GROUP_PREFIX + p.g;
-        } else if (p.k === 'text' && text) {
-          c.hidden = false;
-          c.messages.push({ id, out: false, text, at: Date.now() });
-          this.state.unsaved = this.unsaved + 1;
-          newIn = d.from;
-        } else if (p.k === 'edit' && theirs && text) {
-          theirs.text = text;
-          theirs.edited = true;
-        } else if (p.k === 'del' && theirs) {
-          theirs.deleted = true;
-          theirs.text = '';
+        } else {
+          if (p.k === 'text' && text) c.hidden = false;
+          if (this.applyMessage(c, d.from, p, id, text, { contact: d.from, mayTime: true })) newIn = d.from;
         }
       } catch {
         // authenticated but malformed: drop it
@@ -694,9 +776,31 @@ export class Messenger {
       g.members = g.members.filter((mb) => mb !== from);
       return false;
     }
-    const theirs = id ? g.messages.find((m) => !m.out && m.from === from && m.id === id && !m.deleted) : undefined;
+    return this.applyMessage(g, from, p, id, text, { mayTime: from === g.owner });
+  }
+
+  /**
+   * Applies a text, edit, deletion, reaction or timer change from `from` to a thread.
+   * `contact` is set for one-to-one threads (incoming messages there carry no `from`).
+   * Returns true for a new text message.
+   */
+  private applyMessage(
+    t: Thread,
+    from: string,
+    p: Payload,
+    id: string | undefined,
+    text: string | undefined,
+    opts: { contact?: string; mayTime: boolean },
+  ): boolean {
+    const now = Date.now();
+    // Edits and deletions may only touch messages this same person sent us.
+    const theirs = id ? t.messages.find((m) => !m.out && (m.from ?? opts.contact) === from && m.id === id && !m.deleted) : undefined;
     if (p.k === 'text' && text) {
-      g.messages.push({ id, out: false, from, text, at: Date.now() });
+      const q = p.q as { id?: unknown; by?: unknown } | undefined;
+      const reply = q && typeof q.id === 'string' && q.id.length <= 32 && typeof q.by === 'string' && isMailboxId(q.by) ? { id: q.id, by: q.by } : undefined;
+      // The sender's timer decides; anything outside the offered values is ignored.
+      const exp = isTimer(p.x) && p.x > 0 ? now + p.x * 1000 : undefined;
+      t.messages.push({ id, out: false, from: opts.contact ? undefined : from, text, at: now, reply, exp });
       this.state.unsaved = this.unsaved + 1;
       return true;
     }
@@ -706,6 +810,16 @@ export class Messenger {
     } else if (p.k === 'del' && theirs) {
       theirs.deleted = true;
       theirs.text = '';
+    } else if (p.k === 'react' && id && typeof p.by === 'string' && (p.e === null || REACTIONS.includes(p.e as string))) {
+      const target = this.findBy(t.messages, id, p.by, opts.contact);
+      if (target && !target.deleted) {
+        const reactions = (target.reactions ??= {});
+        if (p.e === null) delete reactions[from];
+        else reactions[from] = p.e as string;
+      }
+    } else if (p.k === 'timer' && opts.mayTime && isTimer(p.s)) {
+      t.timer = p.s || undefined;
+      t.messages.push({ out: false, from: opts.contact ? undefined : from, text: '', at: now, info: { timer: p.s, by: from } });
     }
     return false;
   }

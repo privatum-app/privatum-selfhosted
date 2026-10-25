@@ -58,6 +58,12 @@ Todas as respostas levam os cabeçalhos de R8. Tamanhos máximos e limites de ta
 | `GET /v1/inbox` (WebSocket) | token | Entrega mensagens pendentes e novas. |
 | `DELETE /v1/messages/{id}` | token | Confirmação de recebimento: apaga do relay. |
 
+**Resposta, reação e mensagens temporárias** (dentro do conteúdo cifrado, em conversa individual ou de grupo):
+
+- `text` pode levar `q {id, by}`: a referência da mensagem respondida (id e autor). O texto citado não viaja; cada aparelho o busca no próprio histórico, então ninguém consegue citar algo que a pessoa não escreveu. Se a original não existe mais, aparece "mensagem original indisponível".
+- `react {id, by, e}`: `e` é um de 👍 ❤️ 😂 😮 😢 🙏, ou `null` para tirar a própria reação. Uma por pessoa por mensagem; fora do conjunto é ignorado.
+- `timer {s}`: prazo das mensagens temporárias, `0` (desligado), 1 hora, 1 dia ou 7 dias. Em conversa individual qualquer um muda; em grupo, só quem o criou. Cada `text` leva o prazo de quem envia em `x`, e o aparelho apaga a mensagem quando ele vence (conferido a cada 15 s e ao abrir). Limites: não impede captura de tela nem cópia em backup feito antes, e a cópia cifrada ainda não entregue fica no relay até ser entregue (no máximo 14 dias).
+
 **Grupos:** não existem para o relay. Cada mensagem do grupo é cifrada separadamente para cada membro pelas sessões Olm de um para um, com o campo `g` (id aleatório do grupo) dentro do conteúdo cifrado. Tipos: `ginfo {g, name, m}` (nome e lista de membros; só é aceito de quem criou o grupo, e quem anuncia um grupo novo é o dono), `text`/`edit`/`del` com `g`, e `gleave {g}`. A lista de membros só muda por `ginfo` do dono; um membro fora da lista é ignorado, e quem sai da lista passa a ler só o histórico. Até 20 membros. O relay vê N mensagens de um para um (metadados: quem envia para quem e quando, como em qualquer conversa).
 
 **Códigos de convite:** 16 bytes aleatórios em base32 (26 caracteres). O relay guarda só o SHA-256 do código, a validade e os usos restantes, e se foi criado pelo painel ou por um membro; **não guarda quem criou nem quem usou**, para não formar um mapa de quem convidou quem. O link do painel é `#r=<código>` (só registro, sem contato).

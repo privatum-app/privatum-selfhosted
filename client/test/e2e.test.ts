@@ -352,3 +352,72 @@ test('groups: pairwise fan-out, only the owner manages members, no fake members'
     for (const m of [alice, bob, carol, mallory]) m.close();
   }
 });
+
+test('replies quote by reference, reactions are a fixed set, timers make messages disappear', opts, async () => {
+  const alice = await Messenger.create('alice passphrase rrt', deps());
+  const bob = await Messenger.create('bob passphrase rrt', deps());
+  try {
+    await alice.addContact(bob.mailbox, 'Bob');
+    await alice.send(bob.mailbox, 'pergunta');
+    await waitFor(() => bob.contact(alice.mailbox)?.messages.length === 1);
+    const asked = bob.contact(alice.mailbox)!.messages[0];
+
+    // Reply: only the reference travels; each side resolves it from its own history.
+    await bob.send(alice.mailbox, 'resposta', asked);
+    await waitFor(() => alice.contact(bob.mailbox)!.messages.length === 2);
+    const answer = alice.contact(bob.mailbox)!.messages[1];
+    assert.deepEqual(answer.reply, { id: alice.contact(bob.mailbox)!.messages[0].id, by: alice.mailbox });
+    assert.equal(alice.quoted(bob.mailbox, answer)?.text, 'pergunta');
+
+    // Reactions: set, change, remove; anything outside the set is refused.
+    await alice.react(bob.mailbox, answer, '👍');
+    await waitFor(() => bob.contact(alice.mailbox)!.messages[1].reactions?.[alice.mailbox] === '👍');
+    await alice.react(bob.mailbox, answer, '❤️');
+    await waitFor(() => bob.contact(alice.mailbox)!.messages[1].reactions?.[alice.mailbox] === '❤️');
+    await alice.react(bob.mailbox, answer, null);
+    await waitFor(() => bob.contact(alice.mailbox)!.messages[1].reactions?.[alice.mailbox] === undefined);
+    await assert.rejects(alice.react(bob.mailbox, answer, 'texto livre'), { message: 'bad_reaction' });
+
+    // Timer: either side of a one-to-one chat sets it; it travels with each message.
+    await assert.rejects(alice.setTimer(bob.mailbox, 123), { message: 'bad_timer' });
+    await alice.setTimer(bob.mailbox, 3600);
+    await waitFor(() => bob.contact(alice.mailbox)!.timer === 3600);
+    assert.equal(bob.contact(alice.mailbox)!.messages.at(-1)!.info?.timer, 3600);
+    await alice.send(bob.mailbox, 'some em 1 hora');
+    await waitFor(() => bob.contact(alice.mailbox)!.messages.some((m) => m.text === 'some em 1 hora'));
+    const fleeting = bob.contact(alice.mailbox)!.messages.find((m) => m.text === 'some em 1 hora')!;
+    assert.ok(fleeting.exp! > Date.now() + 3590_000 && fleeting.exp! < Date.now() + 3610_000);
+
+    // When the time comes, it goes (moved forward here instead of waiting an hour).
+    fleeting.exp = Date.now() - 1;
+    assert.equal((bob as unknown as { sweep(): boolean }).sweep(), true);
+    assert.ok(!bob.contact(alice.mailbox)!.messages.some((m) => m.text === 'some em 1 hora'));
+    assert.equal(bob.contact(alice.mailbox)!.messages[0].text, 'pergunta', 'messages without a timer stay');
+
+    await bob.setTimer(alice.mailbox, 0);
+    await waitFor(() => alice.contact(bob.mailbox)!.timer === undefined);
+  } finally {
+    alice.close();
+    bob.close();
+  }
+});
+
+test('in a group, only the owner sets the timer', opts, async () => {
+  const alice = await Messenger.create('alice passphrase gtm', deps());
+  const bob = await Messenger.create('bob passphrase gtm', deps());
+  try {
+    await alice.addContact(bob.mailbox, 'Bob');
+    const g = await alice.createGroup('Temporário', [bob.mailbox]);
+    await waitFor(() => bob.group(g.id) !== undefined);
+    await assert.rejects(bob.setTimer(GROUP_PREFIX + g.id, 3600), { message: 'not_owner' });
+    await (bob as unknown as { deliver(mb: string, p: object): Promise<void> }).deliver(alice.mailbox, { k: 'timer', s: 3600, g: g.id });
+    await alice.setTimer(GROUP_PREFIX + g.id, 86_400);
+    await waitFor(() => bob.group(g.id)!.timer === 86_400);
+    await bob.send(GROUP_PREFIX + g.id, 'marcador');
+    await waitFor(() => alice.group(g.id)!.messages.some((m) => m.text === 'marcador'));
+    assert.equal(alice.group(g.id)!.timer, 86_400, "bob's forged timer was ignored");
+  } finally {
+    alice.close();
+    bob.close();
+  }
+});
