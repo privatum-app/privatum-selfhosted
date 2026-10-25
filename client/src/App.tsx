@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { Fragment, useEffect, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { inviteLink, parseInvite, parseRegistrationCode, safetyCode } from './core/identity.ts';
 import {
   AVATAR_COUNT,
@@ -50,6 +50,18 @@ const describe = (e: unknown) => {
   return ERRORS[code] ?? (e instanceof KeyMismatchError ? ERRORS.identity_mismatch : `Erro: ${code}`);
 };
 
+const dayKey = (at: number) => new Date(at).toDateString();
+
+/** "Hoje", "Ontem", or the date (with the year only when it is not this year). */
+function dayLabel(at: number) {
+  const d = new Date(at);
+  const today = new Date();
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'Hoje';
+  if (d.toDateString() === yesterday.toDateString()) return 'Ontem';
+  return d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', ...(d.getFullYear() === today.getFullYear() ? {} : { year: 'numeric' }) });
+}
+
 const time = (at: number) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 const TIMER_LABELS: Record<number, string> = { 0: 'Desligadas', 3600: '1 hora', 86_400: '1 dia', 604_800: '7 dias' };
@@ -73,7 +85,8 @@ export function App() {
   // Read the invite once, then drop it from the address bar.
   const [pendingInvite, setPendingInvite] = useState(() => parseInvite(location.hash));
   const [registrationCode] = useState(() => parseRegistrationCode(location.hash) ?? undefined);
-  const [error, setError] = useState('');
+  const [wasmFailed, setWasmFailed] = useState(false);
+  const [tutorial, setTutorial] = useState(false);
 
   useEffect(() => {
     if (location.hash) history.replaceState(null, '', location.pathname);
@@ -82,17 +95,23 @@ export function App() {
         setDeps({ olm, storage, base: location.origin, host: location.host });
         setHasIdentity(await Messenger.exists(storage));
       })
-      .catch(() =>
-        setError('Não foi possível carregar a criptografia (WebAssembly). No Tor Browser, use o nível de segurança "Standard".'),
-      );
+      .catch(() => setWasmFailed(true));
   }, []);
 
-  if (error) return <Welcome><p className="notice danger">{error}</p></Welcome>;
+  if (wasmFailed) return <Welcome><SaferHelp /></Welcome>;
   if (!deps || hasIdentity === null) return <Welcome><p className="muted">Carregando a criptografia…</p></Welcome>;
   if (!messenger) {
     return (
       <Welcome>
-        <Gate isNew={!hasIdentity} deps={deps} invite={registrationCode} onReady={setMessenger} />
+        <Gate
+          isNew={!hasIdentity}
+          deps={deps}
+          invite={registrationCode}
+          onReady={(m, created) => {
+            setTutorial(created);
+            setMessenger(m);
+          }}
+        />
       </Welcome>
     );
   }
@@ -107,7 +126,15 @@ export function App() {
     setHasIdentity(false);
   };
   return (
-    <Chat m={messenger} pendingInvite={pendingInvite} clearInvite={() => setPendingInvite(null)} onLock={lock} onLogout={logout} />
+    <Chat
+      m={messenger}
+      pendingInvite={pendingInvite}
+      clearInvite={() => setPendingInvite(null)}
+      onLock={lock}
+      onLogout={logout}
+      tutorial={tutorial}
+      onTutorialDone={() => setTutorial(false)}
+    />
   );
 }
 
@@ -126,7 +153,60 @@ function Welcome({ children }: { children: ReactNode }) {
   );
 }
 
-function Gate({ isNew, deps, invite, onReady }: { isNew: boolean; deps: Deps; invite?: string; onReady: (m: Messenger) => void }) {
+/**
+ * The client needs WebAssembly, which Tor Browser turns off at the "Safer" and "Safest"
+ * levels. Say exactly how to get back to "Standard" instead of just failing.
+ */
+function SaferHelp() {
+  return (
+    <div className="panel gate">
+      <h2>Ajuste o nível de segurança do Tor Browser</h2>
+      <p className="muted">
+        {typeof WebAssembly === 'undefined'
+          ? 'Este navegador está com o WebAssembly desligado. No Tor Browser isso acontece nos níveis "Mais seguro" (Safer) e "O mais seguro" (Safest).'
+          : 'Não foi possível carregar a criptografia (WebAssembly).'}{' '}
+        O Privatum cifra tudo no seu navegador e precisa dele.
+      </p>
+      <ol className="steps">
+        <li>Toque no ícone do <strong>escudo</strong>, ao lado da barra de endereço (no Android: menu ⋮ → Configurações → Privacidade e segurança).</li>
+        <li>Abra <strong>Configurações de segurança</strong> e escolha <strong>Padrão</strong> (Standard).</li>
+        <li>Recarregue esta página.</li>
+      </ol>
+      <p className="hint">
+        O nível Padrão vale para todos os sites que você abrir. Se preferir, volte ao nível anterior quando terminar de usar o Privatum.
+      </p>
+      <button className="btn primary" onClick={() => location.reload()}>Recarregar</button>
+    </div>
+  );
+}
+
+function Tutorial({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Modal open={open} onClose={onClose} title="Como o Privatum funciona">
+      <div className="stack">
+        <ol className="steps">
+          <li>
+            <strong>Sua identidade mora neste navegador.</strong> As chaves e conversas ficam cifradas aqui com a sua senha local. A instância só
+            repassa mensagens que não consegue ler.
+          </li>
+          <li>
+            <strong>Convide pelo “Meu convite”</strong> (ícone de link, no topo). Mande o link por um canal em que você confia.
+          </li>
+          <li>
+            <strong>Confira o código de segurança</strong> de cada contato por voz ou pessoalmente. Se for igual nos dois aparelhos, ninguém está no
+            meio.
+          </li>
+          <li>
+            <strong>Exporte o backup.</strong> O Tor Browser apaga os dados ao fechar. Sem o arquivo de backup e a senha, a identidade se perde.
+          </li>
+        </ol>
+        <button className="btn primary" onClick={onClose}>Entendi</button>
+      </div>
+    </Modal>
+  );
+}
+
+function Gate({ isNew, deps, invite, onReady }: { isNew: boolean; deps: Deps; invite?: string; onReady: (m: Messenger, created: boolean) => void }) {
   const [pass, setPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
   const [backup, setBackup] = useState<File | null>(null);
@@ -149,6 +229,7 @@ function Gate({ isNew, deps, invite, onReady }: { isNew: boolean; deps: Deps; in
           : isNew
             ? await Messenger.create(pass, deps, invite)
             : await Messenger.unlock(pass, deps),
+        creating,
       );
     } catch (err) {
       setError(describe(err));
@@ -267,12 +348,16 @@ function Chat({
   clearInvite,
   onLock,
   onLogout,
+  tutorial,
+  onTutorialDone,
 }: {
   m: Messenger;
   pendingInvite: string | null;
   clearInvite: () => void;
   onLock: () => void;
   onLogout: () => Promise<void>;
+  tutorial: boolean;
+  onTutorialDone: () => void;
 }) {
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const [selected, setSelected] = useState<string | null>(null);
@@ -280,6 +365,13 @@ function Chat({
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [muted, setMuted] = useState(readMuted);
   const [unread, setUnread] = useState<Record<string, number>>({});
+  // Unread count when the open conversation was opened, for its "new messages" divider.
+  const [openedUnread, setOpenedUnread] = useState(0);
+  const [help, setHelp] = useState(false);
+  const open = (key: string) => {
+    setOpenedUnread(key === selected ? 0 : unread[key] ?? 0);
+    setSelected(key);
+  };
   const selectedRef = useRef(selected);
   const mutedRef = useRef(muted);
   selectedRef.current = selected;
@@ -352,6 +444,9 @@ function Chat({
             <span className="me-name">Privatum</span>
           </div>
           <div className="toolbar">
+            <button className="icon-btn" title="Como funciona" aria-label="Como funciona" onClick={() => setHelp(true)}>
+              <Icon name="help" />
+            </button>
             <button className="icon-btn" title="Meu convite" aria-label="Meu convite" onClick={() => setDialog('invite')}>
               <Icon name="link" />
             </button>
@@ -405,9 +500,9 @@ function Chat({
               return (
                 <li key={t.key}>
                   {'c' in t ? (
-                    <ContactRow c={t.c} alike={!!m.lookalike(t.c.mailbox)} unread={rowUnread} active={t.key === selected} onOpen={() => setSelected(t.key)} />
+                    <ContactRow c={t.c} alike={!!m.lookalike(t.c.mailbox)} unread={rowUnread} active={t.key === selected} onOpen={() => open(t.key)} />
                   ) : (
-                    <GroupRow m={m} g={t.g} unread={rowUnread} active={t.key === selected} onOpen={() => setSelected(t.key)} />
+                    <GroupRow m={m} g={t.g} unread={rowUnread} active={t.key === selected} onOpen={() => open(t.key)} />
                   )}
                 </li>
               );
@@ -418,9 +513,9 @@ function Chat({
 
       <section className="conversation">
         {contact ? (
-          <Conversation key={contact.mailbox} m={m} c={contact} onBack={() => setSelected(null)} onConfirm={setConfirmation} />
+          <Conversation key={contact.mailbox} m={m} c={contact} newCount={openedUnread} onBack={() => setSelected(null)} onConfirm={setConfirmation} />
         ) : group ? (
-          <GroupConversation key={group.id} m={m} g={group} onBack={() => setSelected(null)} onConfirm={setConfirmation} />
+          <GroupConversation key={group.id} m={m} g={group} newCount={openedUnread} onBack={() => setSelected(null)} onConfirm={setConfirmation} />
         ) : (
           <div className="conv-empty">
             <Logo size={96} />
@@ -475,10 +570,17 @@ function Chat({
           onAdded={(mb) => {
             clearInvite();
             setDialog(null);
-            setSelected(mb);
+            open(mb);
           }}
         />
       </Modal>
+      <Tutorial
+        open={tutorial || help}
+        onClose={() => {
+          setHelp(false);
+          onTutorialDone();
+        }}
+      />
       <Modal open={dialog === 'group'} onClose={() => setDialog(null)} title="Novo grupo">
         {dialog === 'group' && (
           <GroupForm
@@ -486,7 +588,7 @@ function Chat({
             onSave={async (name, members) => {
               const g = await m.createGroup(name, members);
               setDialog(null);
-              setSelected(GROUP_PREFIX + g.id);
+              open(GROUP_PREFIX + g.id);
             }}
           />
         )}
@@ -789,7 +891,19 @@ function closeMenu(e: { currentTarget: Element }) {
   if (menu) menu.open = false;
 }
 
-function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; onBack: () => void; onConfirm: (x: Confirmation) => void }) {
+function Conversation({
+  m,
+  c,
+  newCount,
+  onBack,
+  onConfirm,
+}: {
+  m: Messenger;
+  c: Contact;
+  newCount: number;
+  onBack: () => void;
+  onConfirm: (x: Confirmation) => void;
+}) {
   const [code, setCode] = useState('');
   const [showCode, setShowCode] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
@@ -895,6 +1009,7 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
         onConfirm={onConfirm}
         searching={searching}
         onCloseSearch={() => setSearching(false)}
+        newCount={newCount}
       />
       <TimerDialog m={m} threadKey={c.mailbox} timer={c.timer} open={showTimer} onClose={() => setShowTimer(false)} />
 
@@ -927,7 +1042,19 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
   );
 }
 
-function GroupConversation({ m, g, onBack, onConfirm }: { m: Messenger; g: Group; onBack: () => void; onConfirm: (x: Confirmation) => void }) {
+function GroupConversation({
+  m,
+  g,
+  newCount,
+  onBack,
+  onConfirm,
+}: {
+  m: Messenger;
+  g: Group;
+  newCount: number;
+  onBack: () => void;
+  onConfirm: (x: Confirmation) => void;
+}) {
   const [showMembers, setShowMembers] = useState(false);
   const [editing, setEditing] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
@@ -1029,6 +1156,7 @@ function GroupConversation({ m, g, onBack, onConfirm }: { m: Messenger; g: Group
         onConfirm={onConfirm}
         searching={searching}
         onCloseSearch={() => setSearching(false)}
+        newCount={newCount}
       />
       <TimerDialog m={m} threadKey={GROUP_PREFIX + g.id} timer={g.timer} open={showTimer} onClose={() => setShowTimer(false)} />
 
@@ -1089,6 +1217,7 @@ function Thread({
   onConfirm,
   searching,
   onCloseSearch,
+  newCount,
 }: {
   m: Messenger;
   threadKey: string;
@@ -1103,6 +1232,8 @@ function Thread({
   onConfirm: (x: Confirmation) => void;
   searching: boolean;
   onCloseSearch: () => void;
+  /** Unread messages when the conversation was opened: a divider marks where they start. */
+  newCount: number;
 }) {
   const [text, setText] = useState('');
   const [error, setError] = useState('');
@@ -1114,6 +1245,16 @@ function Thread({
   const [query, setQuery] = useState('');
   const q = searching ? sameText(query) : '';
   const shown = q ? messages.filter((msg) => !msg.info && !msg.deleted && sameText(msg.text).includes(q)) : messages;
+  // Index of the first of the last `newCount` incoming messages (no divider while searching).
+  let firstNew = -1;
+  if (!q && newCount > 0) {
+    for (let i = shown.length - 1, seen = 0; i >= 0; i--) {
+      if (!shown[i].out && !shown[i].info && ++seen === newCount) {
+        firstNew = i;
+        break;
+      }
+    }
+  }
 
   // Braces matter: newer browsers return a Promise from scrollIntoView, which
   // React would then try to call as the effect's cleanup.
@@ -1173,24 +1314,39 @@ function Thread({
         )}
         {q && shown.length === 0 && <p className="muted messages-empty">Nenhuma mensagem com esse texto.</p>}
         {shown.map((msg, i) => {
+          const prev = shown[i - 1];
+          const newDay = !prev || dayKey(prev.at) !== dayKey(msg.at);
+          // Same author, same day, under 5 minutes apart: drawn as one block.
+          const cont = !newDay && !!prev && !prev.info && !msg.info && authorOf(prev) === authorOf(msg) && msg.at - prev.at < 5 * 60_000 && i !== firstNew;
+          const marks = (
+            <>
+              {newDay && <p className="day-sep">{dayLabel(msg.at)}</p>}
+              {i === firstNew && <p className="new-sep">{newCount === 1 ? '1 mensagem nova' : `${newCount} mensagens novas`}</p>}
+            </>
+          );
           if (msg.info) {
             return (
-              <p key={i} className="info-line">
-                <Icon name="timer" /> {timerNotice(nameOf(msg.info.by), msg.info.timer)}
-              </p>
+              <Fragment key={i}>
+                {marks}
+                <p className="info-line">
+                  <Icon name="timer" /> {timerNotice(nameOf(msg.info.by), msg.info.timer)}
+                </p>
+              </Fragment>
             );
           }
           const quoted = msg.reply && m.quoted(threadKey, msg);
           const mine = msg.reactions?.[m.mailbox];
           const counts = Object.values(msg.reactions ?? {}).reduce<Record<string, number>>((acc, e) => ({ ...acc, [e]: (acc[e] ?? 0) + 1 }), {});
           return (
-          <div key={i} className={msg.out ? 'msg out' : 'msg in'}>
+          <Fragment key={i}>
+          {marks}
+          <div className={`msg ${msg.out ? 'out' : 'in'}${cont ? ' cont' : ''}`}>
             <button
               className={msg.out ? 'bubble out' : 'bubble in'}
               aria-expanded={actionsFor === msg}
               onClick={() => setActionsFor(actionsFor === msg ? null : msg)}
             >
-              {group && !msg.out && msg.from && <span className="sender">{nameOf(msg.from)}</span>}
+              {group && !msg.out && msg.from && !cont && <span className="sender">{nameOf(msg.from)}</span>}
               {msg.reply && (
                 <span className="quote">
                   {quoted ? (
@@ -1297,6 +1453,7 @@ function Thread({
               </div>
             )}
           </div>
+          </Fragment>
           );
         })}
         <div ref={end} />
