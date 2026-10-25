@@ -36,10 +36,35 @@ export interface Message {
   out: boolean;
   text: string;
   at: number;
+  /** At least one recipient did not get it (for a group: someone may still have). */
   failed?: boolean;
   edited?: boolean;
   deleted?: boolean;
+  /** Sender of an incoming group message. */
+  from?: string;
 }
+
+/**
+ * A group is only a convention between clients: each message is encrypted separately
+ * for every member over the usual pairwise sessions, so the relay sees ordinary
+ * one-to-one messages. Only the creator (owner) changes the member list.
+ */
+export interface Group {
+  id: string;
+  name: string;
+  owner: string;
+  /** Every member, us and the owner included. */
+  members: string[];
+  messages: Message[];
+  /** We left or were removed: history stays, nothing more is sent or accepted. */
+  left?: boolean;
+}
+
+/** Thread keys: a contact's mailbox, or this prefix plus a group id. */
+export const GROUP_PREFIX = 'g:';
+/** Members per group, us included: every message is encrypted once per member. */
+export const MAX_GROUP = 20;
+export const MAX_GROUP_NAME = 48;
 
 /** Number of avatars in the client's gallery; contacts only ever send an index. */
 export const AVATAR_COUNT = 20;
@@ -48,7 +73,8 @@ const isAvatar = (x: unknown): x is number => Number.isInteger(x) && (x as numbe
 /** Longest display name a contact may send; longer names are cut. */
 export const MAX_NAME = 32;
 // Control and format characters (bidi overrides included) are stripped so a name can't disguise itself.
-const cleanName = (x: unknown) => (typeof x === 'string' ? x.replace(/[\p{Cc}\p{Cf}]/gu, '').trim().slice(0, MAX_NAME) || undefined : undefined);
+const cleanName = (x: unknown, max = MAX_NAME) =>
+  typeof x === 'string' ? x.replace(/[\p{Cc}\p{Cf}]/gu, '').trim().slice(0, max) || undefined : undefined;
 
 /** Name given to a contact when nobody typed one. */
 export const defaultName = (mailbox: string) => `Contato ${mailbox.slice(0, 6)}`;
@@ -69,6 +95,8 @@ export interface Contact {
   avatar?: number;
   /** Display name the contact chose (sent to us encrypted). */
   nick?: string;
+  /** Known only as a member of a group we are in: kept for its keys and name, not listed. */
+  hidden?: boolean;
 }
 
 interface Saved {
@@ -87,9 +115,24 @@ interface Saved {
   avatar?: number;
   /** Our own display name, shared with contacts inside encrypted messages. */
   nick?: string;
+  groups?: Record<string, Group>;
 }
 
 const BACKUP_FORMAT = 'privatum-backup';
+
+/** Decrypted payload; every field is untrusted until checked. */
+interface Payload {
+  k?: unknown;
+  b?: unknown;
+  id?: unknown;
+  a?: unknown;
+  n?: unknown;
+  /** Group id: the message belongs to that group. */
+  g?: unknown;
+  /** ginfo: group name and member list. */
+  name?: unknown;
+  m?: unknown;
+}
 const saltBytes = (salt: string) => Uint8Array.from(atob(salt), (c) => c.charCodeAt(0));
 
 interface Envelope {
@@ -235,8 +278,17 @@ export class Messenger {
     return this.state.mailbox;
   }
 
+  /** Contacts to list: people known only through a group are left out. */
   get contacts(): Contact[] {
-    return Object.values(this.state.contacts);
+    return Object.values(this.state.contacts).filter((c) => !c.hidden);
+  }
+
+  get groups(): Group[] {
+    return Object.values(this.state.groups ?? {});
+  }
+
+  group(id: string): Group | undefined {
+    return this.state.groups?.[id];
   }
 
   contact(mailbox: string): Contact | undefined {
@@ -358,7 +410,17 @@ export class Messenger {
     if (!isMailboxId(mailbox) || mailbox === this.mailbox) throw new Error('bad_invite');
     this.state.blocked = (this.state.blocked ?? []).filter((m) => m !== mailbox);
     const existing = this.state.contacts[mailbox];
-    if (existing) return existing;
+    if (existing) {
+      // Someone we knew only from a group becomes a contact of ours.
+      if (existing.hidden) {
+        existing.hidden = false;
+        existing.name = name;
+        existing.addedByMe = true;
+        await this.save();
+        this.changed();
+      }
+      return existing;
+    }
     const { session, ed25519, curve25519 } = await this.startSession(mailbox);
     const c: Contact = { mailbox, ed25519, curve25519, name, addedByMe: true, verified: false, messages: [] };
     this.state.contacts[mailbox] = c;
@@ -368,39 +430,66 @@ export class Messenger {
     return c;
   }
 
-  async send(mailbox: string, text: string): Promise<void> {
-    const c = this.state.contacts[mailbox];
+  /** A contact's mailbox or GROUP_PREFIX + group id: its messages and who receives them. */
+  private thread(key: string): { messages: Message[]; to: string[]; g?: string } | undefined {
+    if (key.startsWith(GROUP_PREFIX)) {
+      const g = this.state.groups?.[key.slice(GROUP_PREFIX.length)];
+      return g && { messages: g.messages, to: g.left ? [] : this.othersIn(g), g: g.id };
+    }
+    const c = this.state.contacts[key];
+    return c && { messages: c.messages, to: [key] };
+  }
+
+  private othersIn(g: Group): string[] {
+    return g.members.filter((mb) => mb !== this.mailbox && !this.state.blocked?.includes(mb));
+  }
+
+  /**
+   * One-to-one: delivers or throws. Group: tries every member and only reports, through
+   * onFail, that someone missed it; the others still get it.
+   */
+  private async fanout(t: { to: string[]; g?: string }, payload: object, onFail?: () => void): Promise<void> {
+    if (t.g === undefined) return this.deliver(t.to[0], payload, onFail);
+    for (const mailbox of t.to) {
+      await this.deliver(mailbox, { ...payload, g: t.g }).catch(() => onFail?.());
+    }
+    await this.save();
+    this.changed();
+  }
+
+  async send(key: string, text: string): Promise<void> {
+    const t = this.thread(key);
     const body = text.trim();
-    if (!c || !body || body.length > MAX_TEXT) throw new Error('bad_message');
+    if (!t || (t.g !== undefined && this.group(t.g)?.left) || !body || body.length > MAX_TEXT) throw new Error('bad_message');
     const at = Date.now();
     const id = b64(crypto.getRandomValues(new Uint8Array(9)));
     const msg: Message = { id, out: true, text: body, at };
-    c.messages.push(msg);
-    await this.deliver(mailbox, { k: 'text', id, b: body, t: at, ...this.profile() }, () => {
+    t.messages.push(msg);
+    await this.fanout(t, { k: 'text', id, b: body, t: at, ...this.profile() }, () => {
       msg.failed = true;
     });
   }
 
-  /** Edits one of our own messages here and on the contact's device. */
-  async editMessage(mailbox: string, id: string, text: string): Promise<void> {
-    const c = this.state.contacts[mailbox];
-    const msg = c?.messages.find((m) => m.out && m.id === id && !m.deleted);
+  /** Edits one of our own messages here and on the other devices. */
+  async editMessage(key: string, id: string, text: string): Promise<void> {
+    const t = this.thread(key);
+    const msg = t?.messages.find((m) => m.out && m.id === id && !m.deleted);
     const body = text.trim();
-    if (!c || !msg || !body || body.length > MAX_TEXT) throw new Error('bad_message');
+    if (!t || !msg || !body || body.length > MAX_TEXT) throw new Error('bad_message');
     msg.text = body;
     msg.edited = true;
-    await this.deliver(mailbox, { k: 'edit', id, b: body });
+    await this.fanout(t, { k: 'edit', id, b: body });
   }
 
   /**
    * Deletes a message. "For everyone" only applies to our own messages and is a
    * request: a modified client, a screenshot or an older backup can still keep it.
    */
-  async deleteMessage(mailbox: string, msg: Message, forEveryone: boolean): Promise<void> {
-    const c = this.state.contacts[mailbox];
-    if (!c || !c.messages.includes(msg)) return;
+  async deleteMessage(key: string, msg: Message, forEveryone: boolean): Promise<void> {
+    const t = this.thread(key);
+    if (!t || !t.messages.includes(msg)) return;
     if (!forEveryone) {
-      c.messages.splice(c.messages.indexOf(msg), 1);
+      t.messages.splice(t.messages.indexOf(msg), 1);
       await this.save();
       this.changed();
       return;
@@ -408,7 +497,59 @@ export class Messenger {
     if (!msg.out || !msg.id) throw new Error('bad_message');
     msg.deleted = true;
     msg.text = '';
-    await this.deliver(mailbox, { k: 'del', id: msg.id });
+    await this.fanout(t, { k: 'del', id: msg.id });
+  }
+
+  /** Creates a group of ours with some of our contacts and tells them, best effort. */
+  async createGroup(name: string, members: string[]): Promise<Group> {
+    const clean = cleanName(name, MAX_GROUP_NAME);
+    const others = [...new Set(members)].filter((mb) => mb !== this.mailbox && this.contacts.some((c) => c.mailbox === mb));
+    if (!clean) throw new Error('bad_group_name');
+    if (others.length === 0 || others.length + 1 > MAX_GROUP) throw new Error('bad_group_members');
+    const id = b64(crypto.getRandomValues(new Uint8Array(12)));
+    const g: Group = { id, name: clean, owner: this.mailbox, members: [this.mailbox, ...others], messages: [] };
+    (this.state.groups ??= {})[id] = g;
+    await this.save();
+    this.changed();
+    await this.announce(g, others);
+    return g;
+  }
+
+  /** Owner only: new member list (our contacts, or people already in it). Removed people are told too. */
+  async setGroupMembers(id: string, members: string[]): Promise<void> {
+    const g = this.group(id);
+    if (!g || g.left || g.owner !== this.mailbox) throw new Error('not_owner');
+    const allowed = (mb: string) => g.members.includes(mb) || this.contacts.some((c) => c.mailbox === mb);
+    const others = [...new Set(members)].filter((mb) => mb !== this.mailbox && allowed(mb));
+    if (others.length === 0 || others.length + 1 > MAX_GROUP) throw new Error('bad_group_members');
+    const removed = g.members.filter((mb) => mb !== this.mailbox && !others.includes(mb));
+    g.members = [this.mailbox, ...others];
+    await this.save();
+    this.changed();
+    await this.announce(g, [...others, ...removed]);
+  }
+
+  private async announce(g: Group, to: string[]) {
+    const payload = { k: 'ginfo', name: g.name, m: g.members };
+    await this.fanout({ to: to.filter((mb) => !this.state.blocked?.includes(mb)), g: g.id }, payload);
+  }
+
+  /** Leaves for good: members are told, the history stays here (read-only). */
+  async leaveGroup(id: string): Promise<void> {
+    const g = this.group(id);
+    if (!g || g.left) return;
+    const to = this.othersIn(g);
+    g.left = true;
+    g.members = g.members.filter((mb) => mb !== this.mailbox);
+    await this.fanout({ to, g: id }, { k: 'gleave' });
+  }
+
+  /** Leaves (if still in it) and forgets the group on this device. */
+  async deleteGroup(id: string): Promise<void> {
+    await this.leaveGroup(id);
+    delete this.state.groups?.[id];
+    await this.save();
+    this.changed();
   }
 
   get avatar(): number | undefined {
@@ -488,23 +629,29 @@ export class Messenger {
   }
 
   private async receive(d: Delivered) {
+    const wasKnown = d.from in this.state.contacts;
     // Blocked senders are not even decrypted, so they can't open a new session either.
     const plain = this.state.blocked?.includes(d.from) ? null : await this.decryptDelivered(d).catch(() => null);
     const c = this.state.contacts[d.from];
-    let isNewText = false;
+    let newIn: string | null = null;
     if (plain && c) {
       try {
-        const p = JSON.parse(fromUtf8(plain)) as { k?: unknown; b?: unknown; id?: unknown; a?: unknown; n?: unknown };
+        const p = JSON.parse(fromUtf8(plain)) as Payload;
         const id = typeof p.id === 'string' && p.id.length <= 32 ? p.id : undefined;
         const text = typeof p.b === 'string' ? p.b.slice(0, MAX_TEXT) : undefined;
         if ('a' in p && (p.a === null || isAvatar(p.a))) c.avatar = p.a ?? undefined;
         if ('n' in p && (p.n === null || typeof p.n === 'string')) c.nick = cleanName(p.n);
         // Edits and deletions may only touch messages this same contact sent us.
         const theirs = id ? c.messages.find((m) => !m.out && m.id === id && !m.deleted) : undefined;
-        if (p.k === 'text' && text) {
+        if (typeof p.g === 'string' && p.g.length <= 32) {
+          // Someone who reaches us only through a group is not listed as a contact.
+          if (!wasKnown) c.hidden = true;
+          if (this.receiveGroup(d.from, p.g, p, id, text)) newIn = GROUP_PREFIX + p.g;
+        } else if (p.k === 'text' && text) {
+          c.hidden = false;
           c.messages.push({ id, out: false, text, at: Date.now() });
           this.state.unsaved = this.unsaved + 1;
-          isNewText = true;
+          newIn = d.from;
         } else if (p.k === 'edit' && theirs && text) {
           theirs.text = text;
           theirs.edited = true;
@@ -520,7 +667,47 @@ export class Messenger {
     await this.save();
     await this.relay.ack(d.id).catch(() => {});
     this.changed();
-    if (isNewText) for (const fn of this.incoming) fn(d.from);
+    if (newIn) for (const fn of this.incoming) fn(newIn);
+  }
+
+  /** Applies a group payload from `from`; returns true for a new text message. */
+  private receiveGroup(from: string, gid: string, p: Payload, id: string | undefined, text: string | undefined): boolean {
+    const groups = (this.state.groups ??= {});
+    const g = groups[gid];
+    if (p.k === 'ginfo') {
+      const members = Array.isArray(p.m) ? [...new Set(p.m.filter((x): x is string => typeof x === 'string' && isMailboxId(x)))] : [];
+      if (members.length > MAX_GROUP || !members.includes(from)) return false;
+      const name = cleanName(p.name, MAX_GROUP_NAME) ?? 'Grupo';
+      if (!g) {
+        // A new group: whoever announces it first is its owner.
+        if (members.includes(this.mailbox)) groups[gid] = { id: gid, name, owner: from, members, messages: [] };
+      } else if (from === g.owner) {
+        // Only the owner changes the list; being left out of it means we were removed.
+        g.name = name;
+        g.members = members;
+        g.left = members.includes(this.mailbox) ? undefined : true;
+      }
+      return false;
+    }
+    if (!g || g.left || !g.members.includes(from)) return false;
+    if (p.k === 'gleave') {
+      g.members = g.members.filter((mb) => mb !== from);
+      return false;
+    }
+    const theirs = id ? g.messages.find((m) => !m.out && m.from === from && m.id === id && !m.deleted) : undefined;
+    if (p.k === 'text' && text) {
+      g.messages.push({ id, out: false, from, text, at: Date.now() });
+      this.state.unsaved = this.unsaved + 1;
+      return true;
+    }
+    if (p.k === 'edit' && theirs && text) {
+      theirs.text = text;
+      theirs.edited = true;
+    } else if (p.k === 'del' && theirs) {
+      theirs.deleted = true;
+      theirs.text = '';
+    }
+    return false;
   }
 
   private async decryptDelivered(d: Delivered): Promise<Uint8Array | null> {

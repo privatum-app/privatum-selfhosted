@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { parseInvite, parseRegistrationCode, inviteLink } from '../src/core/identity.ts';
-import { Messenger, KeyMismatchError, contactName, type Deps, type Olm } from '../src/core/messenger.ts';
+import { Messenger, KeyMismatchError, GROUP_PREFIX, contactName, type Deps, type Olm } from '../src/core/messenger.ts';
 import type { Storage } from '../src/core/vault.ts';
 
 const base = process.env.PRIVATUM_TEST_BASE;
@@ -295,5 +295,60 @@ test('invite-only instance: joining needs the code from a member invite', { skip
   } finally {
     await setMode('open');
     alice.close();
+  }
+});
+
+test('groups: pairwise fan-out, only the owner manages members, no fake members', opts, async () => {
+  const alice = await Messenger.create('alice passphrase grp', deps());
+  const bob = await Messenger.create('bob passphrase grp', deps());
+  const carol = await Messenger.create('carol passphrase grp', deps());
+  const mallory = await Messenger.create('mallory passphrase grp', deps());
+  const heard: string[] = [];
+  bob.onIncoming((k) => heard.push(k));
+  try {
+    await alice.addContact(bob.mailbox, 'Bob');
+    await alice.addContact(carol.mailbox, 'Carol');
+    await assert.rejects(alice.createGroup('Sem contato', [mallory.mailbox]), { message: 'bad_group_members' });
+    const g = await alice.createGroup('Família', [bob.mailbox, carol.mailbox]);
+    const key = GROUP_PREFIX + g.id;
+    await waitFor(() => bob.group(g.id) !== undefined && carol.group(g.id) !== undefined);
+    assert.equal(bob.group(g.id)!.owner, alice.mailbox);
+    assert.equal(bob.group(g.id)!.name, 'Família');
+
+    // Carol and Bob never added each other: the group is enough to talk, but they stay unlisted.
+    await carol.send(key, 'oi grupo');
+    await waitFor(() => bob.group(g.id)!.messages.length === 1 && alice.group(g.id)!.messages.length === 1);
+    const got = bob.group(g.id)!.messages[0];
+    assert.equal(got.from, carol.mailbox);
+    assert.equal(got.text, 'oi grupo');
+    assert.deepEqual(heard, [key]);
+    assert.ok(!bob.contacts.some((c) => c.mailbox === carol.mailbox), 'group-only peer is not listed');
+    assert.ok(bob.contact(carol.mailbox), 'but its keys and name are kept');
+
+    // Edits reach everyone; nobody can edit someone else's message.
+    await carol.editMessage(key, carol.group(g.id)!.messages[0].id!, 'oi, grupo!');
+    await waitFor(() => bob.group(g.id)!.messages[0].text === 'oi, grupo!');
+
+    // Bob is not the owner: his member list is ignored, and he can't manage the group.
+    await assert.rejects(bob.setGroupMembers(g.id, [alice.mailbox, mallory.mailbox]), { message: 'not_owner' });
+    const forged = { k: 'ginfo', g: g.id, name: 'Tomado', m: [alice.mailbox, bob.mailbox, carol.mailbox, mallory.mailbox] };
+    await (bob as unknown as { deliver(mb: string, p: object): Promise<void> }).deliver(carol.mailbox, forged);
+    await bob.send(key, 'marcador');
+    await waitFor(() => carol.group(g.id)!.messages.some((m) => m.text === 'marcador'));
+    assert.equal(carol.group(g.id)!.name, 'Família');
+    assert.ok(!carol.group(g.id)!.members.includes(mallory.mailbox));
+
+    // The owner removes Carol: she is told, keeps the history, can't send.
+    await alice.setGroupMembers(g.id, [bob.mailbox]);
+    await waitFor(() => carol.group(g.id)!.left === true && !bob.group(g.id)!.members.includes(carol.mailbox));
+    await assert.rejects(carol.send(key, 'ainda aqui?'), { message: 'bad_message' });
+    assert.equal(carol.group(g.id)!.messages.length, 2);
+
+    // Bob leaves: the owner sees it.
+    await bob.leaveGroup(g.id);
+    await waitFor(() => !alice.group(g.id)!.members.includes(bob.mailbox));
+    assert.equal(bob.group(g.id)!.left, true);
+  } finally {
+    for (const m of [alice, bob, carol, mallory]) m.close();
   }
 });

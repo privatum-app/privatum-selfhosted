@@ -238,6 +238,15 @@ export function Avatar({ avatar, seed, size = 40 }: { avatar?: number; seed: str
   );
 }
 
+/** Groups have no avatar of their own: a people mark on the same disc. */
+export function GroupAvatar({ size = 40 }: { size?: number }) {
+  return (
+    <span className="group-avatar" style={{ width: size, height: size }} aria-hidden="true">
+      <Icon name="group" />
+    </span>
+  );
+}
+
 /** The Privatum key mark (vector redraw of the brand logo). */
 export function Logo({ size = 32 }: { size?: number }) {
   return (
@@ -264,6 +273,7 @@ const PATHS: Record<string, string> = {
   check: 'M8.5 12.5l2.5 2.5 4.5-5',
   sound: 'M5 9v6h4l5 4V5L9 9zM17 9a4 4 0 0 1 0 6',
   muted: 'M5 9v6h4l5 4V5L9 9zM17 9l4 6M21 9l-4 6',
+  group: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5M16 5.2a3 3 0 0 1 0 5.6M18 14.3c1.6.6 2.5 2.4 2.5 4.7',
 };
 
 export function Icon({ name }: { name: keyof typeof PATHS | string }) {
@@ -282,7 +292,11 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
-    if (open && !d.open) d.showModal();
+    if (open && !d.open) {
+      d.showModal();
+      // showModal focuses the first control (the close button); prefer the field marked for it.
+      d.querySelector<HTMLElement>('[data-autofocus]')?.focus();
+    }
     if (!open && d.open) d.close();
   }, [open]);
   return (

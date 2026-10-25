@@ -1,8 +1,22 @@
 import { useEffect, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { inviteLink, parseInvite, parseRegistrationCode, safetyCode } from './core/identity.ts';
-import { AVATAR_COUNT, KeyMismatchError, MAX_NAME, Messenger, contactName, defaultName, type Contact, type Deps, type Message } from './core/messenger.ts';
+import {
+  AVATAR_COUNT,
+  GROUP_PREFIX,
+  KeyMismatchError,
+  MAX_GROUP,
+  MAX_GROUP_NAME,
+  MAX_NAME,
+  Messenger,
+  contactName,
+  defaultName,
+  type Contact,
+  type Deps,
+  type Group,
+  type Message,
+} from './core/messenger.ts';
 import { loadOlm, storage } from './platform.ts';
-import { AVATAR_NAMES, Avatar, Icon, Logo, Modal, Sigil } from './ui.tsx';
+import { AVATAR_NAMES, Avatar, GroupAvatar, Icon, Logo, Modal, Sigil } from './ui.tsx';
 
 const MIN_PASSPHRASE = 12;
 
@@ -19,6 +33,9 @@ const ERRORS: Record<string, string> = {
   invite_required: 'Esta instância só aceita pessoas convidadas. Abra o link de convite completo que você recebeu.',
   invalid_invite: 'Este convite já foi usado ou expirou. Peça um convite novo a quem te chamou.',
   registration_closed: 'Esta instância não está aceitando pessoas novas.',
+  bad_group_name: 'Dê um nome ao grupo.',
+  bad_group_members: `Escolha de 1 a ${MAX_GROUP - 1} contatos.`,
+  not_owner: 'Só quem criou o grupo muda os membros.',
 };
 
 const describe = (e: unknown) => {
@@ -242,7 +259,7 @@ function Chat({
 }) {
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const [selected, setSelected] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<'invite' | 'add' | 'avatar' | 'name' | null>(pendingInvite ? 'add' : null);
+  const [dialog, setDialog] = useState<'invite' | 'add' | 'avatar' | 'name' | 'group' | null>(pendingInvite ? 'add' : null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [muted, setMuted] = useState(readMuted);
   const [unread, setUnread] = useState<Record<string, number>>({});
@@ -290,8 +307,13 @@ function Chat({
     return () => removeEventListener('beforeunload', warn);
   }, [m]);
 
-  const contact = selected ? m.contact(selected) : undefined;
-  const contacts = [...m.contacts].sort((a, b) => (b.messages.at(-1)?.at ?? 0) - (a.messages.at(-1)?.at ?? 0));
+  // `selected` is a thread key: a contact's mailbox, or GROUP_PREFIX + group id.
+  const group = selected?.startsWith(GROUP_PREFIX) ? m.group(selected.slice(GROUP_PREFIX.length)) : undefined;
+  const contact = selected && !group ? m.contact(selected) : undefined;
+  const threads = [
+    ...m.contacts.map((c) => ({ key: c.mailbox, last: c.messages.at(-1)?.at ?? 0, c })),
+    ...m.groups.map((g) => ({ key: GROUP_PREFIX + g.id, last: g.messages.at(-1)?.at ?? 0, g })),
+  ].sort((a, b) => b.last - a.last);
   const logout = () =>
     setConfirmation({
       title: 'Sair deste navegador?',
@@ -305,7 +327,7 @@ function Chat({
     });
 
   return (
-    <div className="app" data-view={contact ? 'conversation' : 'list'}>
+    <div className="app" data-view={contact || group ? 'conversation' : 'list'}>
       <aside className="sidebar">
         <header className="side-head">
           <div className="me">
@@ -348,19 +370,31 @@ function Chat({
           </button>
         )}
 
-        <button className="btn primary new-chat" onClick={() => setDialog('add')}>
-          <Icon name="plus" /> Nova conversa
-        </button>
+        <div className="new-row">
+          <button className="btn primary new-chat" onClick={() => setDialog('add')}>
+            <Icon name="plus" /> Nova conversa
+          </button>
+          <button className="btn quiet" onClick={() => setDialog('group')} disabled={m.contacts.length === 0} title="Novo grupo">
+            <Icon name="group" /> Grupo
+          </button>
+        </div>
 
-        {contacts.length === 0 ? (
+        {threads.length === 0 ? (
           <p className="muted side-empty">Nenhuma conversa ainda. Envie seu convite ou cole o convite de alguém.</p>
         ) : (
           <ul className="contacts">
-            {contacts.map((c) => (
-              <li key={c.mailbox}>
-                <ContactRow c={c} unread={c.mailbox === selected ? 0 : unread[c.mailbox] ?? 0} active={c.mailbox === selected} onOpen={() => setSelected(c.mailbox)} />
-              </li>
-            ))}
+            {threads.map((t) => {
+              const rowUnread = t.key === selected ? 0 : unread[t.key] ?? 0;
+              return (
+                <li key={t.key}>
+                  {'c' in t ? (
+                    <ContactRow c={t.c} unread={rowUnread} active={t.key === selected} onOpen={() => setSelected(t.key)} />
+                  ) : (
+                    <GroupRow m={m} g={t.g} unread={rowUnread} active={t.key === selected} onOpen={() => setSelected(t.key)} />
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </aside>
@@ -368,6 +402,8 @@ function Chat({
       <section className="conversation">
         {contact ? (
           <Conversation key={contact.mailbox} m={m} c={contact} onBack={() => setSelected(null)} onConfirm={setConfirmation} />
+        ) : group ? (
+          <GroupConversation key={group.id} m={m} g={group} onBack={() => setSelected(null)} onConfirm={setConfirmation} />
         ) : (
           <div className="conv-empty">
             <Logo size={96} />
@@ -426,6 +462,18 @@ function Chat({
           }}
         />
       </Modal>
+      <Modal open={dialog === 'group'} onClose={() => setDialog(null)} title="Novo grupo">
+        {dialog === 'group' && (
+          <GroupForm
+            m={m}
+            onSave={async (name, members) => {
+              const g = await m.createGroup(name, members);
+              setDialog(null);
+              setSelected(GROUP_PREFIX + g.id);
+            }}
+          />
+        )}
+      </Modal>
       <Modal open={confirmation !== null} onClose={() => setConfirmation(null)} title={confirmation?.title ?? ''}>
         <p className="muted">{confirmation?.body}</p>
         <div className="modal-actions">
@@ -468,6 +516,83 @@ function ContactRow({ c, active, unread, onOpen }: { c: Contact; active: boolean
         </span>
       </span>
     </button>
+  );
+}
+
+/** Who wrote a message in a group: our name for them, the name they chose, or the default. */
+function memberName(m: Messenger, mailbox: string) {
+  if (mailbox === m.mailbox) return 'Você';
+  const c = m.contact(mailbox);
+  return c ? contactName(c) : defaultName(mailbox);
+}
+
+function GroupRow({ m, g, active, unread, onOpen }: { m: Messenger; g: Group; active: boolean; unread: number; onOpen: () => void }) {
+  const last = g.messages.at(-1);
+  const who = last && (last.out ? 'Você' : memberName(m, last.from ?? ''));
+  return (
+    <button className={active ? 'contact active' : 'contact'} onClick={onOpen} aria-current={active || undefined}>
+      <GroupAvatar size={40} />
+      <span className="contact-text">
+        <span className="contact-top">
+          <span className="contact-name">{g.name}</span>
+          {last && <time>{time(last.at)}</time>}
+          {unread > 0 && <span className="unread" aria-label={`${unread} novas`}>{unread}</span>}
+        </span>
+        <span className="contact-preview">
+          {g.left && <span className="tag warn">fora do grupo</span>}
+          <span className="preview-text">{last ? (last.deleted ? 'Mensagem apagada' : `${who}: ${last.text}`) : `${g.members.length} pessoas`}</span>
+        </span>
+      </span>
+    </button>
+  );
+}
+
+/** Creates a group, or (owner) edits its members. Members can be contacts or people already in it. */
+function GroupForm({ m, group, onSave }: { m: Messenger; group?: Group; onSave: (name: string, members: string[]) => Promise<void> }) {
+  const [name, setName] = useState(group?.name ?? '');
+  const [picked, setPicked] = useState<string[]>(group ? group.members.filter((mb) => mb !== m.mailbox) : []);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const candidates = [...new Set([...(group?.members ?? []), ...m.contacts.map((c) => c.mailbox)])].filter((mb) => mb !== m.mailbox);
+  const toggle = (mb: string) => setPicked((p) => (p.includes(mb) ? p.filter((x) => x !== mb) : [...p, mb]));
+  return (
+    <form
+      className="stack"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setError('');
+        setBusy(true);
+        try {
+          await onSave(name, picked);
+        } catch (err) {
+          setError(describe(err));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {!group && (
+        <label className="field">
+          <span>Nome do grupo</span>
+          <input value={name} maxLength={MAX_GROUP_NAME} onChange={(e) => setName(e.target.value)} data-autofocus />
+        </label>
+      )}
+      <fieldset className="pick">
+        <legend>Membros ({picked.length + 1} de até {MAX_GROUP}, contando você)</legend>
+        {candidates.map((mb) => (
+          <label key={mb} className="check">
+            <input type="checkbox" checked={picked.includes(mb)} onChange={() => toggle(mb)} />
+            {memberName(m, mb)}
+          </label>
+        ))}
+      </fieldset>
+      <p className="hint">
+        Cada mensagem é cifrada separadamente para cada membro. Os membros veem a lista do grupo, mesmo quem não é contato entre si; a instância não
+        sabe que o grupo existe.
+      </p>
+      {error && <p className="notice danger" role="alert">{error}</p>}
+      <button className="btn primary" disabled={busy}>{busy ? 'Avisando os membros…' : group ? 'Salvar membros' : 'Criar grupo'}</button>
+    </form>
   );
 }
 
@@ -533,7 +658,7 @@ function MyName({ m, onDone }: { m: Messenger; onDone: () => void }) {
       <p className="muted">O nome que seus contatos veem. Vai cifrado dentro das mensagens; a instância não sabe qual é. Se um contato já deu outro nome a você, o dele prevalece no aparelho dele.</p>
       <label className="field">
         <span>Nome</span>
-        <input value={name} maxLength={MAX_NAME} placeholder="Ex.: Ana" onChange={(e) => setName(e.target.value)} />
+        <input value={name} maxLength={MAX_NAME} placeholder="Ex.: Ana" onChange={(e) => setName(e.target.value)} data-autofocus />
       </label>
       <button className="btn primary">Salvar</button>
       {m.nick && (
@@ -591,38 +716,12 @@ function closeMenu(e: { currentTarget: Element }) {
 }
 
 function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; onBack: () => void; onConfirm: (x: Confirmation) => void }) {
-  const [text, setText] = useState('');
-  const [error, setError] = useState('');
   const [code, setCode] = useState('');
   const [showCode, setShowCode] = useState(false);
-  const [actionsFor, setActionsFor] = useState<Message | null>(null);
-  const [editing, setEditing] = useState<Message | null>(null);
-  const end = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     safetyCode(m.mailbox, c.mailbox).then(setCode);
   }, [m, c.mailbox]);
-  // Braces matter: newer browsers return a Promise from scrollIntoView, which
-  // React would then try to call as the effect's cleanup.
-  useEffect(() => {
-    end.current?.scrollIntoView({ block: 'end' });
-  }, [c.messages.length]);
-
-  async function send(e?: FormEvent) {
-    e?.preventDefault();
-    if (!text.trim()) return;
-    setError('');
-    const t = text;
-    const target = editing;
-    setText('');
-    setEditing(null);
-    try {
-      if (target?.id) await m.editMessage(c.mailbox, target.id, t);
-      else await m.send(c.mailbox, t);
-    } catch (err) {
-      setError(describe(err));
-    }
-  }
 
   const trust = c.verified ? 'ok' : c.addedByMe ? 'neutral' : 'warn';
   return (
@@ -690,27 +789,232 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
         </p>
       )}
 
+      <Thread m={m} threadKey={c.mailbox} messages={c.messages} others="no aparelho do contato" onConfirm={onConfirm} />
+
+      <Modal open={showCode} onClose={() => setShowCode(false)} title="Código de segurança">
+        <div className="stack">
+          <div className="seal">
+            <Sigil seed={m.mailbox} size={44} />
+            <Sigil seed={c.mailbox} size={44} />
+          </div>
+          <p className="muted">
+            Compare estes números com {contactName(c)} por voz ou pessoalmente. Se forem iguais nos dois aparelhos, ninguém se colocou no meio da
+            conversa.
+          </p>
+          <div className="code">
+            {code.split(' ').map((g, i) => (
+              <span key={i}>{g}</span>
+            ))}
+          </div>
+          <label className="check">
+            <input type="checkbox" checked={c.verified} onChange={(e) => m.setVerified(c.mailbox, e.target.checked)} />
+            Os números são iguais nos dois aparelhos
+          </label>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+function GroupConversation({ m, g, onBack, onConfirm }: { m: Messenger; g: Group; onBack: () => void; onConfirm: (x: Confirmation) => void }) {
+  const [showMembers, setShowMembers] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const owner = g.owner === m.mailbox && !g.left;
+  return (
+    <>
+      <header className="conv-head">
+        <button className="icon-btn back" aria-label="Fechar conversa" title="Fechar conversa" onClick={onBack}>
+          <Icon name="back" />
+        </button>
+        <GroupAvatar size={40} />
+        <div className="conv-title">
+          <h2>{g.name}</h2>
+          <button className="trust neutral" onClick={() => setShowMembers(true)}>
+            <Icon name="group" />
+            {g.members.length} {g.members.length === 1 ? 'pessoa' : 'pessoas'}
+          </button>
+        </div>
+        <details className="menu">
+          <summary className="icon-btn" aria-label="Mais ações">
+            <Icon name="more" />
+          </summary>
+          <div className="menu-list">
+            <button
+              onClick={(e) => {
+                closeMenu(e);
+                setShowMembers(true);
+              }}
+            >
+              Membros
+            </button>
+            {!g.left && (
+              <button
+                onClick={(e) => {
+                  closeMenu(e);
+                  onConfirm({
+                    title: `Sair de ${g.name}?`,
+                    body: 'Os membros são avisados e você para de receber as mensagens do grupo. O histórico fica neste aparelho. Para voltar, quem criou o grupo precisa adicionar você de novo.',
+                    action: 'Sair do grupo',
+                    danger: true,
+                    run: () => m.leaveGroup(g.id),
+                  });
+                }}
+              >
+                Sair do grupo
+              </button>
+            )}
+            <button
+              className="danger"
+              onClick={(e) => {
+                closeMenu(e);
+                onConfirm({
+                  title: 'Apagar o grupo deste aparelho?',
+                  body: g.left
+                    ? 'O histórico do grupo será apagado deste aparelho e não poderá ser recuperado.'
+                    : 'Você sai do grupo (os membros são avisados) e o histórico é apagado deste aparelho.',
+                  action: 'Apagar grupo',
+                  danger: true,
+                  run: async () => {
+                    onBack();
+                    await m.deleteGroup(g.id);
+                  },
+                });
+              }}
+            >
+              Apagar grupo
+            </button>
+          </div>
+        </details>
+      </header>
+
+      {g.left && <p className="banner">Você não faz mais parte deste grupo. O histórico fica só para leitura.</p>}
+
+      <Thread
+        m={m}
+        threadKey={GROUP_PREFIX + g.id}
+        messages={g.messages}
+        readOnly={g.left}
+        senderName={(mb) => memberName(m, mb)}
+        others="nos aparelhos dos membros"
+        onConfirm={onConfirm}
+      />
+
+      <Modal
+        open={showMembers}
+        onClose={() => {
+          setShowMembers(false);
+          setEditing(false);
+        }}
+        title={editing ? 'Editar membros' : 'Membros'}
+      >
+        {editing ? (
+          <GroupForm
+            m={m}
+            group={g}
+            onSave={async (_, members) => {
+              await m.setGroupMembers(g.id, members);
+              setEditing(false);
+            }}
+          />
+        ) : (
+          <div className="stack">
+            <ul className="member-list">
+              {g.members.map((mb) => (
+                <li key={mb}>
+                  <span>{memberName(m, mb)}</span>
+                  {mb === g.owner && <span className="tag ok">criou o grupo</span>}
+                  {mb !== m.mailbox && !m.contacts.some((c) => c.mailbox === mb) && <span className="tag warn">não é seu contato</span>}
+                </li>
+              ))}
+            </ul>
+            <p className="hint">
+              Só quem criou o grupo muda os membros. Quem não é seu contato aparece pelo nome que escolheu; para conferir a identidade, adicione o
+              convite da pessoa e compare o código de segurança.
+            </p>
+            {owner && (
+              <button className="btn primary" onClick={() => setEditing(true)}>
+                Editar membros
+              </button>
+            )}
+          </div>
+        )}
+      </Modal>
+    </>
+  );
+}
+
+/** Messages and composer, shared by one-to-one and group conversations. */
+function Thread({
+  m,
+  threadKey,
+  messages,
+  readOnly,
+  senderName,
+  others,
+  onConfirm,
+}: {
+  m: Messenger;
+  threadKey: string;
+  messages: Message[];
+  readOnly?: boolean;
+  /** Groups: label incoming messages with their sender. */
+  senderName?: (mailbox: string) => string;
+  /** Where "delete for everyone" also deletes, for the confirmation text. */
+  others: string;
+  onConfirm: (x: Confirmation) => void;
+}) {
+  const [text, setText] = useState('');
+  const [error, setError] = useState('');
+  const [actionsFor, setActionsFor] = useState<Message | null>(null);
+  const [editing, setEditing] = useState<Message | null>(null);
+  const end = useRef<HTMLDivElement>(null);
+
+  // Braces matter: newer browsers return a Promise from scrollIntoView, which
+  // React would then try to call as the effect's cleanup.
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: 'end' });
+  }, [messages.length]);
+
+  async function send(e?: FormEvent) {
+    e?.preventDefault();
+    if (!text.trim()) return;
+    setError('');
+    const t = text;
+    const target = editing;
+    setText('');
+    setEditing(null);
+    try {
+      if (target?.id) await m.editMessage(threadKey, target.id, t);
+      else await m.send(threadKey, t);
+    } catch (err) {
+      setError(describe(err));
+    }
+  }
+
+  return (
+    <>
       <div className="messages" role="log" aria-live="polite">
-        {c.messages.length === 0 && (
+        {messages.length === 0 && (
           <p className="muted messages-empty">Nenhuma mensagem ainda. Tudo o que você escrever é cifrado antes de sair deste navegador.</p>
         )}
-        {c.messages.map((msg, i) => (
+        {messages.map((msg, i) => (
           <div key={i} className={msg.out ? 'msg out' : 'msg in'}>
             <button
               className={msg.out ? 'bubble out' : 'bubble in'}
               aria-expanded={actionsFor === msg}
               onClick={() => setActionsFor(actionsFor === msg ? null : msg)}
             >
+              {senderName && !msg.out && msg.from && <span className="sender">{senderName(msg.from)}</span>}
               {msg.deleted ? <span className="bubble-text deleted">Mensagem apagada</span> : <span className="bubble-text">{msg.text}</span>}
               <time>
                 {time(msg.at)}
                 {msg.edited && !msg.deleted ? ' · editada' : ''}
-                {msg.failed ? ' · não enviada' : ''}
+                {msg.failed ? (senderName ? ' · não chegou a todos' : ' · não enviada') : ''}
               </time>
             </button>
             {actionsFor === msg && (
               <div className="msg-actions">
-                {msg.out && msg.id && !msg.deleted && (
+                {msg.out && msg.id && !msg.deleted && !readOnly && (
                   <button
                     onClick={() => {
                       setEditing(msg);
@@ -721,17 +1025,17 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
                     Editar
                   </button>
                 )}
-                {msg.out && msg.id && !msg.deleted && (
+                {msg.out && msg.id && !msg.deleted && !readOnly && (
                   <button
                     className="danger"
                     onClick={() => {
                       setActionsFor(null);
                       onConfirm({
                         title: 'Apagar para todos?',
-                        body: 'A mensagem será apagada aqui e no aparelho do contato. Não há como garantir que ele não a viu, não fez captura de tela nem tem um backup anterior.',
+                        body: `A mensagem será apagada aqui e ${others}. Não há como garantir que ninguém a viu, fez captura de tela ou tem um backup anterior.`,
                         action: 'Apagar para todos',
                         danger: true,
-                        run: () => m.deleteMessage(c.mailbox, msg, true).catch((err) => setError(describe(err))),
+                        run: () => m.deleteMessage(threadKey, msg, true).catch((err) => setError(describe(err))),
                       });
                     }}
                   >
@@ -743,10 +1047,10 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
                     setActionsFor(null);
                     onConfirm({
                       title: 'Apagar para mim?',
-                      body: 'A mensagem some só deste aparelho. O contato continua com ela.',
+                      body: 'A mensagem some só deste aparelho. Os outros continuam com ela.',
                       action: 'Apagar para mim',
                       danger: true,
-                      run: () => m.deleteMessage(c.mailbox, msg, false),
+                      run: () => m.deleteMessage(threadKey, msg, false),
                     });
                   }}
                 >
@@ -774,47 +1078,27 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
           </button>
         </div>
       )}
-      <form className="composer" onSubmit={send}>
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              void send();
-            }
-          }}
-          rows={Math.min(6, text.split('\n').length)}
-          placeholder="Mensagem"
-          maxLength={4000}
-          aria-label="Mensagem"
-        />
-        <button className="send" aria-label="Enviar" disabled={!text.trim()}>
-          <Icon name="send" />
-        </button>
-      </form>
-
-      <Modal open={showCode} onClose={() => setShowCode(false)} title="Código de segurança">
-        <div className="stack">
-          <div className="seal">
-            <Sigil seed={m.mailbox} size={44} />
-            <Sigil seed={c.mailbox} size={44} />
-          </div>
-          <p className="muted">
-            Compare estes números com {contactName(c)} por voz ou pessoalmente. Se forem iguais nos dois aparelhos, ninguém se colocou no meio da
-            conversa.
-          </p>
-          <div className="code">
-            {code.split(' ').map((g, i) => (
-              <span key={i}>{g}</span>
-            ))}
-          </div>
-          <label className="check">
-            <input type="checkbox" checked={c.verified} onChange={(e) => m.setVerified(c.mailbox, e.target.checked)} />
-            Os números são iguais nos dois aparelhos
-          </label>
-        </div>
-      </Modal>
+      {!readOnly && (
+        <form className="composer" onSubmit={send}>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                void send();
+              }
+            }}
+            rows={Math.min(6, text.split('\n').length)}
+            placeholder="Mensagem"
+            maxLength={4000}
+            aria-label="Mensagem"
+          />
+          <button className="send" aria-label="Enviar" disabled={!text.trim()}>
+            <Icon name="send" />
+          </button>
+        </form>
+      )}
     </>
   );
 }

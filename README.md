@@ -124,6 +124,11 @@ O backup é cifrado com a sua senha local; quem tiver o arquivo pode tentar adiv
 - **Apagar conversa:** remove o contato e o histórico só deste aparelho. Se a pessoa escrever de novo, a conversa reaparece como "não verificada", sem o histórico antigo.
 - **Bloquear:** apaga a conversa e descarta, sem ler, tudo o que essa pessoa enviar. Para desbloquear, adicione o convite dela de novo. O bloqueio é local: a instância continua aceitando as mensagens dela e o seu aparelho as descarta.
 
+### Grupos
+
+- **Grupo** (ao lado de "Nova conversa") cria um grupo com até 19 contatos seus. Cada mensagem é cifrada separadamente para cada membro; a instância não sabe que o grupo existe.
+- Só quem criou o grupo adiciona ou remove pessoas. Qualquer um pode sair. Os membros veem a lista e as mensagens de todos, inclusive de quem não é seu contato (aparece pelo nome que escolheu, marcado como "não é seu contato"). Para conferir a identidade de alguém, adicione o convite dessa pessoa e compare o código de segurança.
+
 ### Editar, apagar, avatar, nome e som
 
 - **Toque numa mensagem** para ver as ações. Nas suas: **Editar** e **Apagar para todos**; em qualquer uma: **Apagar para mim**. "Apagar para todos" é um pedido ao aparelho do contato: não garante que ele não viu, não fez captura de tela nem guarda um backup anterior.
