@@ -229,13 +229,24 @@ const ART = [
   </g>,
 ];
 
-/** One gallery avatar, or the onion sigil when none was chosen. */
-export function Avatar({ avatar, seed, size = 40 }: { avatar?: number; seed: string; size?: number }) {
-  if (avatar === undefined || !ART[avatar]) return <Sigil seed={seed} size={size} />;
+/** Default avatar for anyone who has not picked one: a stylized onion, after Tor. */
+const DEFAULT_ART = (
+  <g>
+    <path d="M24 12c0-3.5 1.8-6 5.5-7M24 12c-.6-2.6-2.4-4.3-5-4.8" stroke={E} strokeWidth="2.2" strokeLinecap="round" fill="none" />
+    <path d="M24 11c8.5 3.8 13.5 9.6 13.5 17a13.5 13.5 0 0 1-27 0c0-7.4 5-13.2 13.5-17z" fill={G} />
+    <path d="M24 16.5c5.6 3 8.6 7.1 8.6 11.6a8.6 8.6 0 0 1-17.2 0c0-4.5 3-8.6 8.6-11.6z" fill="none" stroke={D} strokeWidth="1.6" />
+    <path d="M24 22c2.9 1.8 4.4 4 4.4 6.3a4.4 4.4 0 0 1-8.8 0c0-2.3 1.5-4.5 4.4-6.3z" fill="none" stroke={D} strokeWidth="1.6" />
+    <circle cx="24" cy="29" r="1.4" fill={D} />
+    <path d="M15.6 25.5c.8-3 2.8-5.6 5.6-7.6" stroke={M} strokeWidth="1.4" strokeLinecap="round" fill="none" />
+  </g>
+);
+
+/** One gallery avatar, or the default onion when none was chosen. */
+export function Avatar({ avatar, size = 40 }: { avatar?: number; size?: number }) {
   return (
     <svg className="sigil" width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
       <circle cx="24" cy="24" r="23.5" className="sigil-bg" />
-      {ART[avatar]}
+      {avatar !== undefined && ART[avatar] ? ART[avatar] : DEFAULT_ART}
     </svg>
   );
 }

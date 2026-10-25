@@ -92,7 +92,7 @@ export const EN: Record<string, string> = {
   'Nenhuma conversa ainda. Envie seu convite ou cole o convite de alguém.': 'No conversations yet. Send your invite or paste someone\'s invite.',
   'Escolha uma conversa ou comece uma nova.': 'Pick a conversation or start a new one.',
   'Mostrar meu convite': 'Show my invite',
-  'Usar o padrão (anéis)': 'Use the default (rings)',
+  'Usar o padrão (cebola)': 'Use the default (onion)',
   'Cancelar': 'Cancel',
   '{n} novas': '{n} new',
   'nome repetido': 'repeated name',

@@ -25,3 +25,6 @@
 .table td { padding: 0.45rem 0.25rem; border-bottom: 1px solid var(--line); }
 .btn.small { min-height: 32px; padding: 0 0.6rem; font-size: 0.85rem; }
 .admin-head .brandmark { margin-right: auto; }
+.admin-col { display: grid; gap: 1rem; align-self: stretch; grid-template-rows: auto 1fr; }
+.brand-card { place-items: center; min-height: 180px; }
+.brand-card .logo { filter: drop-shadow(0 0 18px rgb(52 211 153 / 0.45)); }

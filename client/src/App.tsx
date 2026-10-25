@@ -467,7 +467,7 @@ function Chat({
 
         <div className="me-row">
           <button className="me-avatar" onClick={() => setDialog('avatar')} title={t('Escolher meu avatar')}>
-            <Avatar avatar={m.avatar} seed={m.mailbox} size={36} />
+            <Avatar avatar={m.avatar} size={36} />
             <span>{t('Meu avatar')}</span>
           </button>
           <button className="me-avatar me-name" onClick={() => setDialog('name')} title={t('Escolher o nome que seus contatos veem')}>
@@ -545,7 +545,7 @@ function Chat({
                 setDialog(null);
               }}
             >
-              <Avatar avatar={i} seed={m.mailbox} size={48} />
+              <Avatar avatar={i} size={48} />
             </button>
           ))}
         </div>
@@ -556,7 +556,7 @@ function Chat({
             setDialog(null);
           }}
         >
-          {t('Usar o padrão (anéis)')}
+          {t('Usar o padrão (cebola)')}
         </button>
       </Modal>
       <Modal open={dialog === 'name'} onClose={() => setDialog(null)} title={t('Meu nome')}>
@@ -625,7 +625,7 @@ function ContactRow({ c, alike, active, unread, onOpen }: { c: Contact; alike: b
   const last = c.messages.at(-1);
   return (
     <button className={active ? 'contact active' : 'contact'} onClick={onOpen} aria-current={active || undefined}>
-      <Avatar avatar={c.avatar} seed={c.mailbox} size={40} />
+      <Avatar avatar={c.avatar} size={40} />
       <span className="contact-text">
         <span className="contact-top">
           <span className="contact-name">{displayName(c)}</span>
@@ -934,7 +934,7 @@ function Conversation({
         <button className="icon-btn back" aria-label={t('Fechar conversa')} title={t('Fechar conversa')} onClick={onBack}>
           <Icon name="back" />
         </button>
-        <Avatar avatar={c.avatar} seed={c.mailbox} size={40} />
+        <Avatar avatar={c.avatar} size={40} />
         <div className="conv-title">
           <h2>
             {displayName(c)}

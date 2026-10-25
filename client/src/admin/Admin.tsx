@@ -207,7 +207,13 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       ) : (
         <div className="admin-grid">
           <Address onion={status.onion} />
-          <Health status={status} />
+          {/* Status and the key mark share a column, filling the space beside the taller address card. */}
+          <div className="admin-col">
+            <Health status={status} />
+            <section className="panel card brand-card" aria-hidden="true">
+              <Logo size={150} />
+            </section>
+          </div>
           <Usage relay={status.relay} />
           <OnionKey onion={status.onion} onRestart={(to) => setRestart({ from: status.onion, to })} />
           {status.relay.ok && <Access />}
