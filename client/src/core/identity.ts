@@ -21,11 +21,19 @@ export async function safetyCode(a: string, b: string): Promise<string> {
   return groups.join(' ');
 }
 
-export const inviteLink = (origin: string, mailbox: string) => `${origin}/#c=${mailbox}`;
+/** `r` carries a registration code when the instance only accepts invited people. */
+export const inviteLink = (origin: string, mailbox: string, code?: string) =>
+  `${origin}/#c=${mailbox}${code ? `&r=${code}` : ''}`;
 
 /** Accepts a full invite link or a bare mailbox id. */
 export function parseInvite(text: string): string | null {
   const t = text.trim();
-  const m = t.match(/#c=([a-z2-7]{52})$/) ?? t.match(/^([a-z2-7]{52})$/);
+  const m = t.match(/#c=([a-z2-7]{52})(?:&|$)/) ?? t.match(/^([a-z2-7]{52})$/);
+  return m ? m[1] : null;
+}
+
+/** Registration code from a member's invite (`&r=`) or from the panel (`#r=`). */
+export function parseRegistrationCode(text: string): string | null {
+  const m = text.trim().match(/[#&]r=([a-z2-7]{26})(?:&|$)/);
   return m ? m[1] : null;
 }

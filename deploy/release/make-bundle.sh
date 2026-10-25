@@ -1,6 +1,5 @@
 #!/bin/sh
-# Builds the end-user bundle: a compose.yaml that uses prebuilt images, the info
-# page and the double-click start/stop shortcuts. The compose file is derived from
+# Builds the end-user bundle: a compose.yaml that uses prebuilt images and the double-click start/stop shortcuts. The compose file is derived from
 # deploy/compose.yaml (build: blocks removed) so the two never drift apart.
 #   usage: deploy/release/make-bundle.sh <relay-image> <tor-image> <output-dir>
 set -eu
@@ -10,7 +9,7 @@ out=$3
 here=$(cd "$(dirname "$0")" && pwd)
 deploy=$(dirname "$here")
 
-mkdir -p "$out/info"
+mkdir -p "$out"
 awk '/^    build:$/ { skip = 1; next } skip && /^      / { next } { skip = 0; print }' "$deploy/compose.yaml" \
   | sed -e "s#image: privatum-relay:local#image: $relay#" \
         -e "s#image: privatum-tor:local#image: $tor#" \
@@ -20,7 +19,6 @@ if grep -q 'build:' "$out/compose.yaml" || ! grep -q "image: $relay" "$out/compo
   exit 1
 fi
 
-cp "$deploy/info/index.html" "$deploy/info/info.sh" "$out/info/"
 cp "$here/iniciar.sh" "$out/iniciar.sh"
 cp "$here/iniciar.sh" "$out/iniciar.command"
 cp "$here/parar.sh" "$out/parar.sh"

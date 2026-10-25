@@ -38,6 +38,7 @@ COPY client/ ./
 COPY --from=wasm /out/web /app/crypto-wasm/pkg/web
 # Precompressed copies (served by the relay when the browser accepts gzip); -n keeps builds reproducible.
 RUN npm run build \
+ && npm run build:admin \
  && find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.wasm' -o -name '*.html' -o -name '*.svg' \) -exec gzip -k -9 -n {} +
 
 # --- relay ---
@@ -50,11 +51,17 @@ COPY relay/Cargo.toml relay/Cargo.lock ./
 COPY relay/src ./src
 RUN cargo build --release --locked \
  && mkdir -p /out/data \
- && cp target/release/privatum-relay /out/
+ && mkdir -p /out/admin-token /out/admin \
+ && cp target/release/privatum-relay target/release/privatum-admin /out/
 
 FROM ${RUNTIME_IMAGE}
-COPY --from=relay /out/privatum-relay /usr/local/bin/privatum-relay
+COPY --from=relay /out/privatum-relay /out/privatum-admin /usr/local/bin/
 COPY --from=client /app/client/dist /srv/client
+# The local admin panel (privatum-admin) runs from this same image; the relay never serves it.
+COPY --from=client /app/client/dist-admin /srv/admin
+# Mount points the panel writes to; it runs as tor's user (100:101) to manage the onion key.
+COPY --from=relay --chown=100:101 /out/admin-token /run/admin-token
+COPY --from=relay --chown=100:101 /out/admin /admin
 # Data directory owned by the distroless "nonroot" user (65532); mount a volume here.
 COPY --from=relay --chown=65532:65532 /out/data /data
 ENV PRIVATUM_STATIC_DIR=/srv/client

@@ -9,7 +9,7 @@ use data_encoding::BASE64_NOPAD;
 use ed25519_dalek::{Signer, SigningKey};
 use futures_util::{SinkExt, StreamExt};
 use http_body_util::BodyExt;
-use privatum_relay::{app, mailbox_id, open_state, Config};
+use privatum_relay::{admin_app, app, mailbox_id, open_state, Config};
 use rand::{rngs::OsRng, RngCore};
 use serde_json::{json, Value};
 use tokio_tungstenite::tungstenite::Message;
@@ -59,11 +59,16 @@ impl User {
     }
 
     async fn register(&self, r: &Router) -> (StatusCode, Value) {
+        self.register_with(r, None).await
+    }
+
+    async fn register_with(&self, r: &Router, invite: Option<&str>) -> (StatusCode, Value) {
         let ed = self.sk.verifying_key().to_bytes();
         let body = json!({
             "ed25519": b64(&ed),
             "curve25519": b64(&self.curve),
             "signature": self.sign(&[b"privatum-register-v1", &ed, &self.curve]),
+            "invite": invite,
         });
         call(r, "POST", "/v1/register", None, body).await
     }
@@ -296,4 +301,134 @@ async fn static_assets_are_cached_and_served_gzipped_but_the_page_is_not() {
     let api = r.oneshot(get("/v1/keys/x")).await.unwrap();
     assert_eq!(api.headers()["cache-control"], "no-store");
     std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[tokio::test]
+async fn admin_api_needs_the_token_and_reports_only_counts() {
+    let cfg = Config { host: HOST.into(), db_path: ":memory:".into(), message_ttl_days: 14, max_mailboxes: 100 };
+    let state = open_state(&cfg).unwrap();
+    let r = app(state.clone(), None);
+    let dir = std::env::temp_dir().join(format!("privatum-admin-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let token_file = dir.join("token");
+    let admin = admin_app(state, token_file.to_string_lossy().into_owned());
+
+    // No token file yet: nothing gets in, not even an empty bearer.
+    assert_eq!(call(&admin, "GET", "/admin/stats", Some(""), json!({})).await.0, StatusCode::UNAUTHORIZED);
+    std::fs::write(&token_file, "s3cret-token\n").unwrap();
+    assert_eq!(call(&admin, "GET", "/admin/stats", None, json!({})).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(call(&admin, "GET", "/admin/stats", Some("wrong"), json!({})).await.0, StatusCode::UNAUTHORIZED);
+
+    User::new().register(&r).await;
+    let (status, v) = call(&admin, "GET", "/admin/stats", Some("s3cret-token"), json!({})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(v["mailboxes"], 1);
+    assert_eq!(v["messages"], 0);
+    assert_eq!(v["message_ttl_days"], 14);
+    // The admin API is not part of the public app.
+    assert_eq!(call(&r, "GET", "/admin/stats", Some("s3cret-token"), json!({})).await.0, StatusCode::NOT_FOUND);
+    std::fs::remove_dir_all(dir).ok();
+}
+
+#[tokio::test]
+async fn new_onion_hostname_drops_tokens_and_binds_new_signatures() {
+    let cfg = Config { host: HOST.into(), db_path: ":memory:".into(), message_ttl_days: 14, max_mailboxes: 100 };
+    let state = open_state(&cfg).unwrap();
+    let r = app(state.clone(), None);
+    let u = User::new();
+    u.register(&r).await;
+    let token = u.login(&r).await;
+    assert!(!state.set_host(HOST), "same name is not a change");
+    let new_host = "anotheronionaddressanotheronionaddressanotheronionaddr.onion";
+    assert!(state.set_host(new_host));
+    assert_eq!(call(&r, "PUT", "/v1/keys", Some(&token), json!({})).await.0, StatusCode::UNAUTHORIZED);
+
+    let (_, c) = call(&r, "POST", "/v1/auth/challenge", None, json!({ "mailbox_id": u.id })).await;
+    let nonce = c["nonce"].as_str().unwrap().to_owned();
+    let raw = BASE64_NOPAD.decode(nonce.as_bytes()).unwrap();
+    let good = json!({ "mailbox_id": u.id, "nonce": nonce, "signature": u.sign(&[b"privatum-auth-v1", new_host.as_bytes(), &raw]) });
+    assert_eq!(call(&r, "POST", "/v1/auth/verify", None, good).await.0, StatusCode::OK);
+}
+
+/// App and admin API over one in-memory relay; the admin token is "t".
+fn app_and_admin() -> (Router, Router, std::path::PathBuf) {
+    let cfg = Config { host: HOST.into(), db_path: ":memory:".into(), message_ttl_days: 14, max_mailboxes: 100 };
+    let state = open_state(&cfg).unwrap();
+    let mut raw = [0u8; 8];
+    OsRng.fill_bytes(&mut raw);
+    let dir = std::env::temp_dir().join(format!("privatum-access-{}", b64(&raw).replace('/', "_")));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("token"), "t").unwrap();
+    let admin = admin_app(state.clone(), dir.join("token").to_string_lossy().into_owned());
+    (app(state, None), admin, dir)
+}
+
+#[tokio::test]
+async fn invite_mode_needs_a_valid_unused_code_but_never_locks_out_members() {
+    let (r, admin, dir) = app_and_admin();
+    let member = User::new();
+    assert_eq!(member.register(&r).await.0, StatusCode::OK, "open by default");
+    assert_eq!(call(&r, "GET", "/v1/instance", None, json!({})).await.1["registration"], "open");
+    let token = member.login(&r).await;
+    assert_eq!(call(&r, "POST", "/v1/invites", Some(&token), json!({})).await.1["error"], "not_invite_mode");
+
+    assert_eq!(call(&admin, "POST", "/admin/registration", Some("t"), json!({ "mode": "nope" })).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(call(&admin, "POST", "/admin/registration", Some("t"), json!({ "mode": "invite" })).await.0, StatusCode::OK);
+    assert_eq!(call(&r, "GET", "/v1/instance", None, json!({})).await.1["registration"], "invite");
+
+    let newcomer = User::new();
+    assert_eq!(newcomer.register(&r).await.1["error"], "invite_required");
+    assert_eq!(newcomer.register_with(&r, Some("aaaaaaaaaaaaaaaaaaaaaaaaaa")).await.1["error"], "invalid_invite");
+    assert_eq!(member.register(&r).await.0, StatusCode::OK, "existing mailboxes need no code");
+
+    // A member's code works once.
+    assert_eq!(call(&r, "POST", "/v1/invites", None, json!({})).await.0, StatusCode::UNAUTHORIZED);
+    let (status, v) = call(&r, "POST", "/v1/invites", Some(&token), json!({})).await;
+    assert_eq!(status, StatusCode::OK);
+    let code = v["code"].as_str().unwrap().to_owned();
+    assert_eq!(code.len(), 26);
+    assert_eq!(newcomer.register_with(&r, Some(&code)).await.0, StatusCode::OK);
+    assert_eq!(User::new().register_with(&r, Some(&code)).await.1["error"], "invalid_invite");
+
+    // An admin code with two uses; revoking it stops the rest.
+    let (_, v) = call(&admin, "POST", "/admin/invites", Some("t"), json!({ "uses": 2, "days": 1 })).await;
+    let admin_code = v["code"].as_str().unwrap().to_owned();
+    assert_eq!(User::new().register_with(&r, Some(&admin_code)).await.0, StatusCode::OK);
+    let (_, access) = call(&admin, "GET", "/admin/access", Some("t"), json!({})).await;
+    let live = access["invites"].as_array().unwrap();
+    assert_eq!(live.len(), 1, "used-up member code is gone");
+    assert_eq!(live[0]["uses_left"], 1);
+    assert_eq!(live[0]["by_admin"], true);
+    assert!(!access.to_string().contains(&admin_code), "the panel never sees codes again, only hash prefixes");
+    let id = live[0]["id"].as_str().unwrap();
+    assert_eq!(call(&admin, "POST", "/admin/invites/revoke", Some("t"), json!({ "id": id })).await.0, StatusCode::OK);
+    assert_eq!(User::new().register_with(&r, Some(&admin_code)).await.1["error"], "invalid_invite");
+    assert_eq!(call(&admin, "POST", "/admin/invites", Some("t"), json!({ "uses": 0, "days": 1 })).await.0, StatusCode::BAD_REQUEST);
+
+    // Closed: nobody new, members still fine.
+    call(&admin, "POST", "/admin/registration", Some("t"), json!({ "mode": "closed" })).await;
+    let (_, v) = call(&admin, "POST", "/admin/invites", Some("t"), json!({ "uses": 1, "days": 1 })).await;
+    assert_eq!(User::new().register_with(&r, v["code"].as_str()).await.1["error"], "registration_closed");
+    assert_eq!(member.register(&r).await.0, StatusCode::OK);
+    std::fs::remove_dir_all(dir).ok();
+}
+
+#[tokio::test]
+async fn removing_a_mailbox_drops_its_keys_queue_and_sessions() {
+    let (r, admin, dir) = app_and_admin();
+    let (alice, bob) = (User::new(), User::new());
+    alice.register(&r).await;
+    bob.register(&r).await;
+    let (ta, tb) = (alice.login(&r).await, bob.login(&r).await);
+    call(&r, "POST", "/v1/messages", Some(&ta), json!({ "to": bob.id, "envelope": "x" })).await;
+    let (_, access) = call(&admin, "GET", "/admin/access", Some("t"), json!({})).await;
+    let row = access["mailboxes"].as_array().unwrap().iter().find(|m| m["id"] == bob.id.as_str()).unwrap().clone();
+    assert_eq!(row["pending"], 1);
+
+    assert_eq!(call(&admin, "POST", "/admin/mailboxes/remove", Some("t"), json!({ "id": bob.id })).await.0, StatusCode::OK);
+    assert_eq!(call(&r, "PUT", "/v1/keys", Some(&tb), json!({})).await.0, StatusCode::UNAUTHORIZED, "session gone");
+    assert_eq!(call(&r, "GET", &format!("/v1/keys/{}", bob.id), Some(&ta), json!({})).await.0, StatusCode::NOT_FOUND);
+    let (_, stats) = call(&admin, "GET", "/admin/stats", Some("t"), json!({})).await;
+    assert_eq!((stats["mailboxes"].clone(), stats["messages"].clone()), (json!(1), json!(0)));
+    std::fs::remove_dir_all(dir).ok();
 }

@@ -62,6 +62,8 @@ h1, h2, p { margin: 0; }
 
 .notice { font-size: 0.9rem; padding: 0.65rem 0.85rem; border-radius: var(--r-control); }
 .notice.danger { color: var(--danger); background: rgb(248 113 113 / 0.08); }
+.notice.warn { color: var(--warn); background: rgb(245 158 11 / 0.08); }
+.notice.ok { color: var(--ok); background: rgb(52 211 153 / 0.08); }
 .link { border: 0; padding: 0; background: none; color: inherit; text-decoration: underline; cursor: pointer; font-weight: 600; }
 
 .tag { flex: none; font-size: 0.72rem; font-weight: 600; padding: 0.05rem 0.45rem; border-radius: 999px; }

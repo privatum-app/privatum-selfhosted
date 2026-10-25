@@ -1,8 +1,8 @@
 # Privatum self-hosted instance: relay + Tor onion service.
 #   cd deploy && docker compose up -d
 #   docker compose exec tor cat /run/onion/hostname   # your .onion address (also in the tor/relay logs)
-# The app is reachable only through the onion address. The "info" service publishes a
-# local-only page (127.0.0.1) that shows that address; Docker Desktop lists it as a link.
+# The app is reachable only through the onion address. The "admin" service publishes a
+# local-only management panel (127.0.0.1) with that address; Docker Desktop lists it as a link.
 
 name: privatum
 
@@ -23,9 +23,12 @@ services:
       PRIVATUM_DB: /data/relay.sqlite
       PRIVATUM_MESSAGE_TTL_DAYS: "14"
       PRIVATUM_MAX_MAILBOXES: "10000"
+      # Internal API for the panel (port 8081). The onion service forwards only to 8080.
+      PRIVATUM_ADMIN_TOKEN_FILE: /run/admin-token/token
     volumes:
       - relay-data:/data
       - onion-hostname:/run/onion:ro
+      - admin-token:/run/admin-token:ro
     networks:
       internal:
         ipv4_address: 172.30.0.10
@@ -47,25 +50,32 @@ services:
       - internal
       - egress
 
-  info:
-    # Local-only page with the .onion address and how to open it. It is not the app.
-    image: busybox:1.37-musl@sha256:5cec3fc171c87218698e85a52af7087de727372aae264a787b8112901a5b0092
+  admin:
+    # Local-only management panel. It is not the app and is never reachable through the .onion.
+    image: privatum-relay:local
+    entrypoint: ["/usr/local/bin/privatum-admin"]
     restart: unless-stopped
-    depends_on: [tor]
+    depends_on: [relay]
     read_only: true
-    user: "65534:65534"
+    # tor's user: the panel manages the onion key and talks to tor's control socket.
+    user: "100:101"
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
-    tmpfs: [/tmp]
-    command: ["/bin/sh", "/info/info.sh"]
+    environment:
+      PRIVATUM_TOR_DIR: /tor
+      PRIVATUM_RELAY_ADMIN: 172.30.0.10:8081
+      PRIVATUM_ADMIN_TOKEN_FILE: /run/admin-token/token
+      PRIVATUM_INFO_PORT: ${PRIVATUM_INFO_PORT:-8099}
     volumes:
-      - ./info:/info:ro
-      - onion-hostname:/run/onion:ro
+      - tor-state:/tor
+      - admin-data:/admin
+      - admin-token:/run/admin-token
     ports:
       # Bound to 127.0.0.1 only: never reachable from the network.
       - "127.0.0.1:${PRIVATUM_INFO_PORT:-8099}:8080"
     networks:
-      - info
+      - internal
+      - admin
 
 networks:
   # The relay has no route to the internet; only tor can reach it.
@@ -75,11 +85,14 @@ networks:
       config:
         - subnet: 172.30.0.0/24
   egress: {}
-  # Separate network for the info page, so it shares nothing with the relay.
-  info: {}
+  # Publishes the panel's port; the internal network cannot publish ports.
+  admin: {}
 
 volumes:
   relay-data:
   # Contains the onion service private key. See docs/OPERATIONS.md for backup.
   tor-state:
   onion-hostname:
+  # Panel password hash, and the token the relay checks for the panel's internal calls.
+  admin-data:
+  admin-token:

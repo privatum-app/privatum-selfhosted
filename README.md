@@ -76,7 +76,7 @@ docker compose up -d
 docker compose exec tor cat /run/onion/hostname
 ```
 
-O jeito mais fácil: no **Docker Desktop**, em **Containers → privatum → info-1**, clique no link **8099:8080**. Abre no seu navegador comum uma página só deste computador (`http://127.0.0.1:8099`) com o endereço `.onion`, um botão para copiá-lo e as instruções. Sem Docker Desktop, abra esse mesmo endereço no navegador.
+O jeito mais fácil: no **Docker Desktop**, em **Containers → privatum → admin-1**, clique no link **8099:8080**. Abre no seu navegador comum o **painel** da instância (`http://127.0.0.1:8099`), que só funciona neste computador. No primeiro acesso você cria a senha do painel; depois ele mostra o endereço `.onion` com QR code, o estado do Tor e do relay e quantas pessoas e mensagens a instância guarda (só contagens). Sem Docker Desktop, abra esse mesmo endereço no navegador.
 
 O comando acima mostra o endereço (algo como `abc...xyz.onion`). Ele também aparece em destaque nos logs: no **Docker Desktop**, abra **Containers → privatum → tor-1** (ou **relay-1**) → **Logs** e procure “Seu Privatum está no ar”. Na primeira vez o Tor pode levar um ou dois minutos para publicar o serviço.
 

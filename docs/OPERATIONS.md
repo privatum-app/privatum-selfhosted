@@ -22,9 +22,33 @@ A última linha mostra o endereço `.onion` da instância. Na primeira vez, publ
 |---|---|---|---|
 | `relay` | `65532` (distroless *nonroot*) | só `internal` (sem acesso à internet) | somente leitura; grava apenas em `/data` |
 | `tor` | `debian-tor` | `internal` + `egress` | somente leitura; grava apenas em `/var/lib/tor` e `/run/onion` |
-| `info` | `65534` (*nobody*) | só `info` | somente leitura; serve uma página gerada em `/tmp` |
+| `admin` | `100` (o mesmo do Tor) | `internal` + `admin` | somente leitura; grava apenas em `/admin` e no token interno |
 
-O aplicativo não publica porta no host. A única porta publicada é a da página `info` (`127.0.0.1:8099`, mude com `PRIVATUM_INFO_PORT`), presa ao endereço local: ela só mostra o endereço `.onion` e não dá acesso ao Privatum. Todos os contêineres rodam sem *capabilities* e com `no-new-privileges`.
+O aplicativo não publica porta no host. A única porta publicada é a do **painel** (`127.0.0.1:8099`, mude com `PRIVATUM_INFO_PORT`), presa ao endereço local. O painel nunca é alcançável pelo `.onion`: o serviço onion só encaminha para a porta 8080 do relay. Todos os contêineres rodam sem *capabilities* e com `no-new-privileges`.
+
+## Painel
+
+O contêiner `admin` serve um painel em `http://127.0.0.1:8099`, só neste computador. No primeiro acesso você cria a senha (mínimo de 10 caracteres). Ele mostra o endereço `.onion` com QR code, o estado do Tor e do relay e contagens de uso (pessoas registradas, mensagens aguardando entrega, tamanho do banco), nunca conteúdo nem quem conversa com quem.
+
+Como ele funciona sem virar uma brecha:
+
+- **Sem acesso ao Docker da máquina.** Fala com o Tor pelo socket de controle dentro do volume do Tor (`/var/lib/tor/control`) e com o relay por uma API interna (porta 8081) que exige um token. O `.onion` não encaminha para nenhuma das duas.
+- **Contra sites maliciosos abertos no mesmo computador:** recusa pedidos endereçados a outro nome que não `127.0.0.1`/`localhost` (DNS rebinding), exige um cabeçalho próprio em toda alteração e usa cookie `SameSite=Strict`.
+- **Senha:** guardada como hash argon2id no volume `privatum_admin-data`; 10 tentativas erradas por minuto, no máximo. Esqueceu? Pare a instância, apague o volume `privatum_admin-data` e crie outra senha no próximo acesso (o endereço e as conversas não são afetados).
+
+Qualquer programa rodando neste computador consegue abrir `127.0.0.1:8099`; a senha é o que protege o painel. Em máquina compartilhada, use uma senha forte.
+
+## Quem pode entrar e contas
+
+No painel, **Quem pode entrar** tem três modos. Quem já tem conta nunca é afetado por eles:
+
+- **Aberta** (padrão): qualquer pessoa com o endereço cria uma identidade.
+- **Só convidados**: é preciso um código. O **Meu convite** de quem já participa passa a levar um código de uso único, válido por 7 dias (cada vez que a pessoa abre o convite, sai um novo). O painel também cria convites (**Convites do painel**: de 1 a 100 usos, de 1 a 30 dias), úteis para você mesmo entrar primeiro. O link do painel aparece uma única vez; a instância guarda só o hash do código.
+- **Fechada**: ninguém novo entra.
+
+A instância não registra quem convidou quem.
+
+**Contas** lista as caixas pelo identificador (o mesmo que vai no convite de cada pessoa), a data de criação e quantas mensagens aguardam entrega. **Remover** apaga a caixa, as chaves públicas dela e as mensagens pendentes; os contatos deixam de conseguir escrever para ela. As conversas no navegador da pessoa continuam lá. Com a instância aberta, ela pode voltar sozinha; nos outros modos, precisa de um convite novo.
 
 ## Volumes
 
@@ -33,10 +57,16 @@ O aplicativo não publica porta no host. A única porta publicada é a da págin
 | `privatum_tor-state` | `hs/hs_ed25519_secret_key` (chave do serviço onion) e cache do Tor | O endereço muda; **todos os convites quebram** | Outra pessoa pode se passar pela sua instância |
 | `privatum_relay-data` | `relay.sqlite`: chaves públicas e mensagens cifradas ainda não entregues | Mensagens pendentes se perdem; as pessoas precisam se registrar de novo | Metadados (quem envia para quem, quando). Nenhum conteúdo em claro |
 | `privatum_onion-hostname` | Só o nome `.onion`, para o relay | Recriado ao subir | Nada além do endereço |
+| `privatum_admin-data` | Hash (argon2id) da senha do painel | Você cria uma senha nova no próximo acesso | Permite tentar descobrir a senha do painel por força bruta |
+| `privatum_admin-token` | Token que o relay exige do painel | Recriado ao subir | Quem tiver o token e acesso à rede interna lê as contagens do relay |
 
 ## Backup da chave onion
 
 A chave é o que identifica a instância. Faça backup cifrado e guarde fora da máquina.
+
+**Pelo painel (recomendado):** cartão **Chave do endereço → Baixar backup**. Você escolhe uma senha (mínimo de 12 caracteres) e o navegador baixa um arquivo `.privatum-onion` já cifrado (PBKDF2 + AES-GCM, as mesmas primitivas do backup das conversas). A chave sai do contêiner só para o navegador deste computador, que a cifra antes de salvar. Para restaurar: **Restaurar backup**, escolha o arquivo e digite a senha. O painel confere se a chave privada corresponde ao endereço antes de gravar qualquer coisa; um arquivo corrompido é recusado e a chave atual fica intacta. Depois o Tor reinicia sozinho no endereço do backup.
+
+**Pelo terminal:**
 
 ```bash
 docker run --rm -v privatum_tor-state:/s:ro -v "$PWD":/out debian:bookworm-slim tar -C /s -cf /out/onion-key.tar hs
@@ -50,7 +80,9 @@ Para restaurar, com a instância parada: decifre o arquivo, extraia em `hs/` den
 
 O endereço não é escolhido nem registrado em lugar nenhum: o Tor o calcula a partir da chave privada em `privatum_tor-state` (`hs/hs_ed25519_secret_key`). Mesma chave, mesmo endereço, para sempre; chave nova, endereço novo.
 
-Para trocar, dentro de `deploy/`:
+**Pelo painel:** cartão **Chave do endereço → Trocar endereço**, digite `TROCAR` para confirmar. O painel apaga a chave e manda o Tor encerrar; o Docker o reinicia e o Tor cria um endereço novo em alguns segundos. O relay passa a usar o novo endereço sozinho. Baixe um backup antes, pelo mesmo cartão, se quiser poder voltar.
+
+**Pelo terminal**, dentro de `deploy/`:
 
 ```bash
 docker compose down
@@ -64,7 +96,7 @@ docker run --rm -v privatum_tor-state:/s debian:bookworm-slim rm -rf /s/hs
 docker compose up -d
 ```
 
-O novo endereço aparece no link `info-1` do Docker Desktop, nos logs e em `docker compose exec tor cat /run/onion/hostname`.
+O novo endereço aparece no painel (link `admin-1` do Docker Desktop), nos logs e em `docker compose exec tor cat /run/onion/hostname`.
 
 Depois da troca:
 
@@ -78,7 +110,7 @@ Quando faz sentido trocar: se a chave vazou (quem a tem pode se passar pela sua 
 
 Ninguém se conecta diretamente à máquina: o navegador e a instância só fazem conexões de saída para a rede Tor. Firewall, roteador e "mesma rede Wi-Fi" não influenciam. Siga nesta ordem:
 
-1. **A instância está no ar?** `docker compose ps` deve mostrar `relay`, `tor` e `info` rodando. O computador precisa estar ligado e acordado (desative o repouso).
+1. **A instância está no ar?** `docker compose ps` deve mostrar `relay`, `tor` e `admin` rodando. O computador precisa estar ligado e acordado (desative o repouso).
 2. **O Tor do aparelho funciona com outros `.onion`?** Teste, por exemplo, `https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion`. Se nem esse abre, o problema é o Tor do aparelho.
 3. **O endereço começa com `https://`?** Precisa ser `http://`. A opção "Copiar link" do WhatsApp e de outros apps troca para `https://`, e aí o Tor Browser responde "Não foi possível conectar". Copie a mensagem (segurar → Copiar) em vez do link.
 4. **Primeira visita:** depois de abrir o Tor Browser, o primeiro acesso pode demorar ou dar "a conexão expirou". Espere dois minutos e tente de novo; recarregar em sequência piora, porque o Tor guarda a falha por alguns minutos.

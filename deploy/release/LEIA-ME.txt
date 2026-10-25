@@ -14,7 +14,8 @@ Pré-alfa, sem auditoria externa. Não use para nada sensível.
    - Linux:   iniciar.sh       (ou, no terminal: ./iniciar.sh)
 
    Na primeira vez ele baixa as imagens do Privatum (cerca de 200 MB). No fim,
-   abre no seu navegador uma página com o endereço .onion da sua instância.
+   abre no seu navegador o painel da instância (http://127.0.0.1:8099), que
+   só funciona neste computador. Crie a senha do painel e copie o endereço .onion.
 
 3. Abra esse endereço no Tor Browser (https://www.torproject.org/download/),
    no nível de segurança Standard. Crie sua identidade e envie o seu convite.

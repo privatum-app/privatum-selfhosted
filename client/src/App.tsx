@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { inviteLink, parseInvite, safetyCode } from './core/identity.ts';
+import { inviteLink, parseInvite, parseRegistrationCode, safetyCode } from './core/identity.ts';
 import { AVATAR_COUNT, KeyMismatchError, MAX_NAME, Messenger, contactName, defaultName, type Contact, type Deps, type Message } from './core/messenger.ts';
 import { loadOlm, storage } from './platform.ts';
 import { AVATAR_NAMES, Avatar, Icon, Logo, Modal, Sigil } from './ui.tsx';
@@ -16,6 +16,9 @@ const ERRORS: Record<string, string> = {
   no_keys: 'O contato ainda não publicou chaves. Tente mais tarde.',
   instance_full: 'Esta instância atingiu o limite de pessoas.',
   rate_limited: 'Muitas tentativas seguidas. Aguarde um minuto.',
+  invite_required: 'Esta instância só aceita pessoas convidadas. Abra o link de convite completo que você recebeu.',
+  invalid_invite: 'Este convite já foi usado ou expirou. Peça um convite novo a quem te chamou.',
+  registration_closed: 'Esta instância não está aceitando pessoas novas.',
 };
 
 const describe = (e: unknown) => {
@@ -35,6 +38,7 @@ export function App() {
   const [messenger, setMessenger] = useState<Messenger | null>(null);
   // Read the invite once, then drop it from the address bar.
   const [pendingInvite, setPendingInvite] = useState(() => parseInvite(location.hash));
+  const [registrationCode] = useState(() => parseRegistrationCode(location.hash) ?? undefined);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -54,7 +58,7 @@ export function App() {
   if (!messenger) {
     return (
       <Welcome>
-        <Gate isNew={!hasIdentity} deps={deps} onReady={setMessenger} />
+        <Gate isNew={!hasIdentity} deps={deps} invite={registrationCode} onReady={setMessenger} />
       </Welcome>
     );
   }
@@ -88,7 +92,7 @@ function Welcome({ children }: { children: ReactNode }) {
   );
 }
 
-function Gate({ isNew, deps, onReady }: { isNew: boolean; deps: Deps; onReady: (m: Messenger) => void }) {
+function Gate({ isNew, deps, invite, onReady }: { isNew: boolean; deps: Deps; invite?: string; onReady: (m: Messenger) => void }) {
   const [pass, setPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
   const [backup, setBackup] = useState<File | null>(null);
@@ -107,9 +111,9 @@ function Gate({ isNew, deps, onReady }: { isNew: boolean; deps: Deps; onReady: (
     try {
       onReady(
         restoring
-          ? await Messenger.importBackup(await backup!.text(), pass, deps)
+          ? await Messenger.importBackup(await backup!.text(), pass, deps, invite)
           : isNew
-            ? await Messenger.create(pass, deps)
+            ? await Messenger.create(pass, deps, invite)
             : await Messenger.unlock(pass, deps),
       );
     } catch (err) {
@@ -408,7 +412,8 @@ function Chat({
         <MyName m={m} onDone={() => setDialog(null)} />
       </Modal>
       <Modal open={dialog === 'invite'} onClose={() => setDialog(null)} title="Meu convite">
-        <MyInvite mailbox={m.mailbox} />
+        {/* Mounted only while open: each opening mints a new code on invite-only instances. */}
+        {dialog === 'invite' && <MyInvite m={m} />}
       </Modal>
       <Modal open={dialog === 'add'} onClose={() => setDialog(null)} title="Nova conversa">
         <AddContact
@@ -466,15 +471,33 @@ function ContactRow({ c, active, unread, onOpen }: { c: Contact; active: boolean
   );
 }
 
-function MyInvite({ mailbox }: { mailbox: string }) {
-  const link = inviteLink(location.origin, mailbox);
+function MyInvite({ m }: { m: Messenger }) {
+  // On an invite-only instance each opening mints a fresh single-use code for one person.
+  const [registration, setRegistration] = useState<string | null>(null);
+  const [link, setLink] = useState(inviteLink(location.origin, m.mailbox));
   const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    m.relay
+      .registration()
+      .then(async (mode) => {
+        if (mode === 'invite') setLink(inviteLink(location.origin, m.mailbox, await m.relay.mintInvite()));
+        setRegistration(mode);
+      })
+      .catch(() => setRegistration('open'));
+  }, [m]);
+  if (registration === null) return <p className="muted">Preparando o convite…</p>;
   return (
     <div className="stack">
       <p className="muted">
         Envie este link por um canal em que você confia. Ele leva o endereço desta instância e a impressão digital da sua chave: quem
         abrir consegue falar só com você.
       </p>
+      {registration === 'invite' && (
+        <p className="notice warn">Esta instância só aceita convidados: este link serve para <strong>uma pessoa</strong> e vale 7 dias. Para convidar outra, feche e abra este convite de novo.</p>
+      )}
+      {registration === 'closed' && (
+        <p className="notice warn">A instância não aceita pessoas novas no momento: o link só funciona para quem já participa dela.</p>
+      )}
       <code className="invite-link">{link}</code>
       <p className="hint">
         Quem receber deve <strong>segurar a mensagem e escolher “Copiar”</strong>, e colar no Tor Browser. “Copiar link” no WhatsApp e

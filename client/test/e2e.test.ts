@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { parseInvite, parseRegistrationCode, inviteLink } from '../src/core/identity.ts';
 import { Messenger, KeyMismatchError, contactName, type Deps, type Olm } from '../src/core/messenger.ts';
 import type { Storage } from '../src/core/vault.ts';
 
@@ -258,5 +259,41 @@ test('one-time key with a forged signature is refused', opts, async () => {
   } finally {
     alice.close();
     bob.close();
+  }
+});
+
+// Needs the relay's internal admin API too: PRIVATUM_TEST_ADMIN=http://localhost:18081 and
+// PRIVATUM_TEST_ADMIN_TOKEN=<token>.
+const adminBase = process.env.PRIVATUM_TEST_ADMIN;
+const setMode = (mode: string) =>
+  fetch(`${adminBase}/admin/registration`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.PRIVATUM_TEST_ADMIN_TOKEN}` },
+    body: JSON.stringify({ mode }),
+  });
+
+test('invite-only instance: joining needs the code from a member invite', { skip: base && adminBase ? false : 'set PRIVATUM_TEST_ADMIN' }, async () => {
+  const alice = await Messenger.create('alice passphrase inv', deps());
+  try {
+    assert.equal((await setMode('invite')).status, 200);
+    assert.equal(await alice.relay.registration(), 'invite');
+
+    const refused = memory();
+    await assert.rejects(Messenger.create('bob passphrase inv', deps(refused)), { message: 'invite_required' });
+    assert.equal(await Messenger.exists(refused), false, 'a refused registration leaves nothing saved');
+
+    const link = inviteLink('http://x.onion', alice.mailbox, await alice.relay.mintInvite());
+    assert.equal(parseInvite(link), alice.mailbox, 'the contact part still parses');
+    const code = parseRegistrationCode(link)!;
+    const bob = await Messenger.create('bob passphrase inv', deps(), code);
+    await assert.rejects(Messenger.create('carol passphrase inv', deps(), code), { message: 'invalid_invite' });
+
+    await bob.addContact(alice.mailbox, 'Alice');
+    await bob.send(alice.mailbox, 'entrei pelo convite');
+    await waitFor(() => alice.contact(bob.mailbox)?.messages.length === 1);
+    bob.close();
+  } finally {
+    await setMode('open');
+    alice.close();
   }
 });

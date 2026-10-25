@@ -10,6 +10,7 @@ Uma instância é um `docker compose` com:
 - **relay**: recebe, guarda temporariamente e entrega blobs cifrados; guarda pacotes de chaves públicas; serve o cliente web estático.
 - **tor**: C Tor publicando o relay como serviço onion v3. Sem domínio, sem IP público, sem TLS próprio (o endereço onion autentica o servidor).
 - **cliente web**: roda no navegador da pessoa (Tor Browser). Faz toda a criptografia localmente.
+- **admin**: painel local (`127.0.0.1`, nunca pelo `.onion`). Fala com o Tor pelo socket de controle e com o relay por uma API interna com token; não tem acesso ao Docker. Guarda o hash argon2id da própria senha. Pode ler e trocar a chave do serviço onion: quem entra no painel controla o endereço da instância.
 
 Protocolo de mensagens: **Olm (Double Ratchet) via vodozemac** (Rust compilado para WASM), auditado pela Least Authority em 2022. Nenhuma criptografia é escrita neste projeto; só a cola entre o WASM e o cliente.
 
@@ -86,6 +87,8 @@ A Fase 0 (somente leitura, 2026-10-20) encontrou no sistema de origem problemas 
 - Imagens: usuário sem root, sistema de arquivos somente leitura, sem segredos na imagem, versões fixadas por digest, assinadas (cosign), com SBOM e build reproduzível.
 - Tor: C Tor a partir de `deb.torproject.org` com verificação de assinatura, versão fixada. Arti reavaliado na Fase 2 (as notas da 2.5.1 ainda marcam partes dos circuitos onion como experimentais).
 - Chave do serviço onion: volume dedicado, permissão `0700`, dono = usuário do Tor. Perder a chave = perder o endereço (todos os convites quebram). Vazar a chave = outra pessoa pode se passar pela instância. Backup cifrado e fora da máquina.
+- Painel: só em `127.0.0.1`; recusa nomes de host que não sejam locais (DNS rebinding), exige cabeçalho próprio em toda alteração (CSRF) e cookie `SameSite=Strict`; senha com hash argon2id e limite de tentativas. O backup da chave sai cifrado do navegador (PBKDF2 + AES-GCM); a restauração confere que a chave privada gera o endereço antes de gravar (falha fechada). Qualquer processo local alcança a porta: a senha é a barreira.
+- Registro: modos aberto, só convidados e fechado. Os códigos são guardados como hash, sem autor nem usuário (sem grafo social no relay).
 - Logs do relay: sem IP (atrás do Tor, de todo modo é `127.0.0.1`), sem identificadores de caixa por padrão, retenção mínima.
 
 ## 8. Em aberto

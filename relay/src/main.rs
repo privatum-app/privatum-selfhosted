@@ -1,6 +1,6 @@
 use std::{env, time::Duration};
 
-use privatum_relay::{app, open_state, Config};
+use privatum_relay::{admin_app, app, open_state, Config};
 
 fn env_or<T: std::str::FromStr>(name: &str, default: T) -> T {
     env::var(name).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
@@ -50,6 +50,36 @@ async fn main() {
             cleaner.cleanup();
         }
     });
+
+    // The panel can rotate or restore the onion key while we run: follow the hostname file.
+    if let Ok(path) = env::var("PRIVATUM_HOST_FILE") {
+        let watched = state.clone();
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(Duration::from_secs(5));
+            loop {
+                tick.tick().await;
+                if let Ok(host) = std::fs::read_to_string(&path) {
+                    if !host.trim().is_empty() && watched.set_host(host.trim()) {
+                        eprintln!("novo endereço onion: http://{}", host.trim());
+                    }
+                }
+            }
+        });
+    }
+
+    if let Ok(token_file) = env::var("PRIVATUM_ADMIN_TOKEN_FILE") {
+        let admin_listen = env::var("PRIVATUM_ADMIN_LISTEN").unwrap_or_else(|_| "0.0.0.0:8081".into());
+        let admin = admin_app(state.clone(), token_file);
+        let listener = tokio::net::TcpListener::bind(&admin_listen).await.unwrap_or_else(|e| {
+            eprintln!("fatal: cannot listen on {admin_listen}: {e}");
+            std::process::exit(1);
+        });
+        tokio::spawn(async move {
+            if let Err(e) = axum::serve(listener, admin).await {
+                eprintln!("admin api error: {e}");
+            }
+        });
+    }
 
     let static_dir = env::var("PRIVATUM_STATIC_DIR").ok();
     let router = app(state, static_dir.as_deref());

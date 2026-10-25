@@ -3,6 +3,10 @@
 # a volume the relay mounts read-only to bind its auth signatures to it.
 set -eu
 
+# Volumes created before the panel existed lack this directory; tor requires it private.
+mkdir -p /var/lib/tor/control
+chmod 0700 /var/lib/tor/control
+
 tor -f /etc/tor/torrc &
 pid=$!
 trap 'kill -TERM "$pid" 2>/dev/null' TERM INT
