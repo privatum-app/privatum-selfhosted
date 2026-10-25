@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import qrcode from 'qrcode-generator';
 
 const B32 = 'abcdefghijklmnopqrstuvwxyz234567';
 
@@ -238,6 +239,22 @@ export function Avatar({ avatar, seed, size = 40 }: { avatar?: number; seed: str
   );
 }
 
+/** QR code of a link, drawn as one SVG path (no canvas, no inline styles). */
+export function Qr({ text }: { text: string }) {
+  const qr = qrcode(0, 'M');
+  qr.addData(text);
+  qr.make();
+  const n = qr.getModuleCount();
+  let d = '';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
+  return (
+    <svg className="qr" viewBox={`-4 -4 ${n + 8} ${n + 8}`} role="img" aria-label="QR code do link">
+      <rect x="-4" y="-4" width={n + 8} height={n + 8} fill="#fff" />
+      <path d={d} fill="#000" />
+    </svg>
+  );
+}
+
 /** Groups have no avatar of their own: a people mark on the same disc. */
 export function GroupAvatar({ size = 40 }: { size?: number }) {
   return (
@@ -273,6 +290,7 @@ const PATHS: Record<string, string> = {
   check: 'M8.5 12.5l2.5 2.5 4.5-5',
   sound: 'M5 9v6h4l5 4V5L9 9zM17 9a4 4 0 0 1 0 6',
   muted: 'M5 9v6h4l5 4V5L9 9zM17 9l4 6M21 9l-4 6',
+  search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4',
   timer: 'M12 8.5v4l2.5 1.5M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM9.5 2.5h5',
   group: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5M16 5.2a3 3 0 0 1 0 5.6M18 14.3c1.6.6 2.5 2.4 2.5 4.7',
 };

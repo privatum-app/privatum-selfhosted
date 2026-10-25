@@ -12,13 +12,14 @@ import {
   TIMERS,
   contactName,
   defaultName,
+  sameText,
   type Contact,
   type Deps,
   type Group,
   type Message,
 } from './core/messenger.ts';
 import { loadOlm, storage } from './platform.ts';
-import { AVATAR_NAMES, Avatar, GroupAvatar, Icon, Logo, Modal, Sigil } from './ui.tsx';
+import { AVATAR_NAMES, Avatar, GroupAvatar, Icon, Logo, Modal, Qr, Sigil } from './ui.tsx';
 
 const MIN_PASSPHRASE = 12;
 
@@ -404,7 +405,7 @@ function Chat({
               return (
                 <li key={t.key}>
                   {'c' in t ? (
-                    <ContactRow c={t.c} unread={rowUnread} active={t.key === selected} onOpen={() => setSelected(t.key)} />
+                    <ContactRow c={t.c} alike={!!m.lookalike(t.c.mailbox)} unread={rowUnread} active={t.key === selected} onOpen={() => setSelected(t.key)} />
                   ) : (
                     <GroupRow m={m} g={t.g} unread={rowUnread} active={t.key === selected} onOpen={() => setSelected(t.key)} />
                   )}
@@ -515,7 +516,7 @@ function Chat({
   );
 }
 
-function ContactRow({ c, active, unread, onOpen }: { c: Contact; active: boolean; unread: number; onOpen: () => void }) {
+function ContactRow({ c, alike, active, unread, onOpen }: { c: Contact; alike: boolean; active: boolean; unread: number; onOpen: () => void }) {
   const last = c.messages.at(-1);
   return (
     <button className={active ? 'contact active' : 'contact'} onClick={onOpen} aria-current={active || undefined}>
@@ -527,7 +528,13 @@ function ContactRow({ c, active, unread, onOpen }: { c: Contact; active: boolean
           {unread > 0 && <span className="unread" aria-label={`${unread} novas`}>{unread}</span>}
         </span>
         <span className="contact-preview">
-          {!c.verified && !c.addedByMe ? <span className="tag warn">não verificado</span> : c.verified && <span className="tag ok">verificado</span>}
+          {alike ? (
+            <span className="tag danger">nome repetido</span>
+          ) : !c.verified && !c.addedByMe ? (
+            <span className="tag warn">não verificado</span>
+          ) : (
+            c.verified && <span className="tag ok">verificado</span>
+          )}
           <span className="preview-text">{preview(last, last?.out ? 'Você' : last?.info ? contactName(c) : '', 'Sem mensagens')}</span>
         </span>
       </span>
@@ -686,6 +693,11 @@ function MyInvite({ m }: { m: Messenger }) {
         <p className="notice warn">A instância não aceita pessoas novas no momento: o link só funciona para quem já participa dela.</p>
       )}
       <code className="invite-link">{link}</code>
+      <Qr text={link} />
+      <p className="hint">
+        Pessoalmente, a outra pessoa pode ler o QR code. Se a câmera abrir outro navegador, copie o link e cole no Tor Browser: endereços .onion só
+        abrem nele.
+      </p>
       <p className="hint">
         Quem receber deve <strong>segurar a mensagem e escolher “Copiar”</strong>, e colar no Tor Browser. “Copiar link” no WhatsApp e
         em outros apps troca <code>http</code> por <code>https</code>, e o endereço deixa de abrir.
@@ -781,6 +793,8 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
   const [code, setCode] = useState('');
   const [showCode, setShowCode] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const alike = m.lookalike(c.mailbox);
 
   useEffect(() => {
     safetyCode(m.mailbox, c.mailbox).then(setCode);
@@ -804,6 +818,9 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
             {c.verified ? 'Código conferido' : 'Conferir código de segurança'}
           </button>
         </div>
+        <button className="icon-btn" title="Buscar na conversa" aria-label="Buscar na conversa" onClick={() => setSearching((v) => !v)}>
+          <Icon name="search" />
+        </button>
         <details className="menu">
           <summary className="icon-btn" aria-label="Mais ações">
             <Icon name="more" />
@@ -856,7 +873,13 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
         </details>
       </header>
 
-      {!c.addedByMe && !c.verified && (
+      {alike ? (
+        <p className="banner danger">
+          Atenção: “{contactName(alike)}” já está nos seus contatos com outra identidade. Pode ser alguém se passando por essa pessoa, ou ela
+          criou uma identidade nova. <button className="link" onClick={() => setShowCode(true)}>Confira o código de segurança</button> com ela por
+          outro meio antes de confiar.
+        </p>
+      ) : !c.addedByMe && !c.verified && (
         <p className="banner">
           Esta pessoa escreveu sem que você tivesse aberto o convite dela.{' '}
           <button className="link" onClick={() => setShowCode(true)}>Confira o código de segurança</button> antes de confiar.
@@ -870,6 +893,8 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
         nameOf={(mb) => (mb === m.mailbox ? 'Você' : contactName(c))}
         others="no aparelho do contato"
         onConfirm={onConfirm}
+        searching={searching}
+        onCloseSearch={() => setSearching(false)}
       />
       <TimerDialog m={m} threadKey={c.mailbox} timer={c.timer} open={showTimer} onClose={() => setShowTimer(false)} />
 
@@ -882,6 +907,10 @@ function Conversation({ m, c, onBack, onConfirm }: { m: Messenger; c: Contact; o
           <p className="muted">
             Compare estes números com {contactName(c)} por voz ou pessoalmente. Se forem iguais nos dois aparelhos, ninguém se colocou no meio da
             conversa.
+          </p>
+          <p className="hint">
+            Este código não muda: ele vem das chaves de identidade, que ficam fixas para este contato (o app recusa chaves diferentes). Se a pessoa
+            criar uma identidade nova, ela aparece como outro contato, sem verificação.
           </p>
           <div className="code">
             {code.split(' ').map((g, i) => (
@@ -902,6 +931,7 @@ function GroupConversation({ m, g, onBack, onConfirm }: { m: Messenger; g: Group
   const [showMembers, setShowMembers] = useState(false);
   const [editing, setEditing] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
+  const [searching, setSearching] = useState(false);
   const owner = g.owner === m.mailbox && !g.left;
   return (
     <>
@@ -920,6 +950,9 @@ function GroupConversation({ m, g, onBack, onConfirm }: { m: Messenger; g: Group
             {g.members.length} {g.members.length === 1 ? 'pessoa' : 'pessoas'}
           </button>
         </div>
+        <button className="icon-btn" title="Buscar na conversa" aria-label="Buscar na conversa" onClick={() => setSearching((v) => !v)}>
+          <Icon name="search" />
+        </button>
         <details className="menu">
           <summary className="icon-btn" aria-label="Mais ações">
             <Icon name="more" />
@@ -994,6 +1027,8 @@ function GroupConversation({ m, g, onBack, onConfirm }: { m: Messenger; g: Group
         nameOf={(mb) => memberName(m, mb)}
         others="nos aparelhos dos membros"
         onConfirm={onConfirm}
+        searching={searching}
+        onCloseSearch={() => setSearching(false)}
       />
       <TimerDialog m={m} threadKey={GROUP_PREFIX + g.id} timer={g.timer} open={showTimer} onClose={() => setShowTimer(false)} />
 
@@ -1022,6 +1057,7 @@ function GroupConversation({ m, g, onBack, onConfirm }: { m: Messenger; g: Group
                   <span>{memberName(m, mb)}</span>
                   {mb === g.owner && <span className="tag ok">criou o grupo</span>}
                   {mb !== m.mailbox && !m.contacts.some((c) => c.mailbox === mb) && <span className="tag warn">não é seu contato</span>}
+                  {m.lookalike(mb) && <span className="tag danger">nome igual ao de outro contato</span>}
                 </li>
               ))}
             </ul>
@@ -1051,6 +1087,8 @@ function Thread({
   nameOf,
   others,
   onConfirm,
+  searching,
+  onCloseSearch,
 }: {
   m: Messenger;
   threadKey: string;
@@ -1063,6 +1101,8 @@ function Thread({
   /** Where "delete for everyone" also deletes, for the confirmation text. */
   others: string;
   onConfirm: (x: Confirmation) => void;
+  searching: boolean;
+  onCloseSearch: () => void;
 }) {
   const [text, setText] = useState('');
   const [error, setError] = useState('');
@@ -1071,12 +1111,15 @@ function Thread({
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const authorOf = (msg: Message) => (msg.out ? m.mailbox : (msg.from ?? threadKey));
+  const [query, setQuery] = useState('');
+  const q = searching ? sameText(query) : '';
+  const shown = q ? messages.filter((msg) => !msg.info && !msg.deleted && sameText(msg.text).includes(q)) : messages;
 
   // Braces matter: newer browsers return a Promise from scrollIntoView, which
   // React would then try to call as the effect's cleanup.
   useEffect(() => {
     end.current?.scrollIntoView({ block: 'end' });
-  }, [messages.length]);
+  }, [shown.length]);
 
   async function send(e?: FormEvent) {
     e?.preventDefault();
@@ -1098,11 +1141,38 @@ function Thread({
 
   return (
     <>
+      {searching && (
+        <div className="search-bar">
+          <Icon name="search" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar nesta conversa"
+            aria-label="Buscar nesta conversa"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') onCloseSearch();
+            }}
+          />
+          {q && <span className="muted">{shown.length === 1 ? '1 mensagem' : `${shown.length} mensagens`}</span>}
+          <button
+            className="icon-btn"
+            aria-label="Fechar busca"
+            onClick={() => {
+              setQuery('');
+              onCloseSearch();
+            }}
+          >
+            <Icon name="x" />
+          </button>
+        </div>
+      )}
       <div className="messages" role="log" aria-live="polite">
         {messages.length === 0 && (
           <p className="muted messages-empty">Nenhuma mensagem ainda. Tudo o que você escrever é cifrado antes de sair deste navegador.</p>
         )}
-        {messages.map((msg, i) => {
+        {q && shown.length === 0 && <p className="muted messages-empty">Nenhuma mensagem com esse texto.</p>}
+        {shown.map((msg, i) => {
           if (msg.info) {
             return (
               <p key={i} className="info-line">

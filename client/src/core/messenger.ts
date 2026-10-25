@@ -102,6 +102,10 @@ export const defaultName = (mailbox: string) => `Contato ${mailbox.slice(0, 6)}`
 /** The name we typed wins; otherwise the name the contact chose; otherwise the default. */
 export const contactName = (c: Contact) => (c.nick && c.name === defaultName(c.mailbox) ? c.nick : c.name);
 
+/** Compares names the way people read them: case, accents and spacing don't count. */
+export const sameText = (s: string) =>
+  s.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
+
 export interface Contact extends Thread {
   mailbox: string;
   ed25519: string;
@@ -320,6 +324,18 @@ export class Messenger {
 
   group(id: string): Group | undefined {
     return this.state.groups?.[id];
+  }
+
+  /**
+   * An unverified contact whose chosen name matches another contact's name: either
+   * someone posing as that person, or that person with a new identity. Keys can't change
+   * under a contact (the mailbox id is their hash), so this is how a swap shows up.
+   */
+  lookalike(mailbox: string): Contact | undefined {
+    const c = this.state.contacts[mailbox];
+    if (!c?.nick || c.verified) return undefined;
+    const nick = sameText(c.nick);
+    return this.contacts.find((o) => o.mailbox !== mailbox && (sameText(contactName(o)) === nick || (o.nick && sameText(o.nick) === nick)));
   }
 
   contact(mailbox: string): Contact | undefined {

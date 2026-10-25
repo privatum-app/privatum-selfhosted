@@ -421,3 +421,22 @@ test('in a group, only the owner sets the timer', opts, async () => {
     bob.close();
   }
 });
+
+test('a stranger using a contact name is flagged until verified', opts, async () => {
+  const alice = await Messenger.create('alice passphrase alk', deps());
+  const ana = await Messenger.create('ana passphrase alk', deps());
+  const impostor = await Messenger.create('impostor passphrase alk', deps());
+  try {
+    await alice.addContact(ana.mailbox, 'Ana Souza');
+    await impostor.setNick('  ana   SOUZÁ ');
+    await impostor.addContact(alice.mailbox, 'Alice');
+    await impostor.send(alice.mailbox, 'oi, sou a Ana, número novo');
+    await waitFor(() => alice.contact(impostor.mailbox)?.messages.length === 1);
+    assert.equal(alice.lookalike(impostor.mailbox)?.mailbox, ana.mailbox);
+    assert.equal(alice.lookalike(ana.mailbox), undefined, 'the contact we added by invite has no chosen name here');
+    alice.setVerified(impostor.mailbox, true);
+    assert.equal(alice.lookalike(impostor.mailbox), undefined, 'a checked safety code clears the warning');
+  } finally {
+    for (const m of [alice, ana, impostor]) m.close();
+  }
+});

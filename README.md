@@ -129,6 +129,12 @@ O backup é cifrado com a sua senha local; quem tiver o arquivo pode tentar adiv
 - **Grupo** (ao lado de "Nova conversa") cria um grupo com até 19 contatos seus. Cada mensagem é cifrada separadamente para cada membro; a instância não sabe que o grupo existe.
 - Só quem criou o grupo adiciona ou remove pessoas. Qualquer um pode sair. Os membros veem a lista e as mensagens de todos, inclusive de quem não é seu contato (aparece pelo nome que escolheu, marcado como "não é seu contato"). Para conferir a identidade de alguém, adicione o convite dessa pessoa e compare o código de segurança.
 
+### Convite por QR, nome repetido e busca
+
+- **Meu convite** mostra também um QR code. Se a câmera do celular abrir outro navegador, copie o link e cole no Tor Browser: endereços `.onion` só abrem nele.
+- **Nome repetido:** se alguém ainda não verificado escolhe o mesmo nome de um contato seu, a conversa mostra um aviso vermelho. Pode ser alguém se passando pela pessoa, ou ela com uma identidade nova; confira o código de segurança por outro meio. O código de um contato nunca muda: ele vem das chaves de identidade, e o app recusa chaves diferentes.
+- **Busca** (lupa no topo da conversa): procura no histórico deste aparelho, sem diferenciar maiúsculas, minúsculas e acentos.
+
 ### Responder, reagir e mensagens temporárias
 
 - **Toque numa mensagem → Responder** para citá-la. **Reações:** 👍 ❤️ 😂 😮 😢 🙏 (toque de novo para tirar).

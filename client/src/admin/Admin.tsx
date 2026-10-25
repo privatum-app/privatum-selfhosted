@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import qrcode from 'qrcode-generator';
 import { decryptBackup, encryptBackup, MIN_BACKUP_PASSPHRASE, type KeyFiles } from './backup.ts';
-import { Icon, Logo, Modal } from '../ui.tsx';
+import { Icon, Logo, Modal, Qr } from '../ui.tsx';
 
 const MIN_PASSWORD = 10;
 
@@ -213,21 +212,6 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
       <h2>{title}</h2>
       {children}
     </section>
-  );
-}
-
-function Qr({ text }: { text: string }) {
-  const qr = qrcode(0, 'M');
-  qr.addData(text);
-  qr.make();
-  const n = qr.getModuleCount();
-  let d = '';
-  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
-  return (
-    <svg className="qr" viewBox={`-4 -4 ${n + 8} ${n + 8}`} role="img" aria-label="QR code do endereço">
-      <rect x="-4" y="-4" width={n + 8} height={n + 8} fill="#fff" />
-      <path d={d} fill="#000" />
-    </svg>
   );
 }
 
