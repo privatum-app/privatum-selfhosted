@@ -1,30 +1,31 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { lang, setLang, t } from '../i18n.ts';
 import { decryptBackup, encryptBackup, MIN_BACKUP_PASSPHRASE, type KeyFiles } from './backup.ts';
 import { Icon, Logo, Modal, Qr } from '../ui.tsx';
 
 const MIN_PASSWORD = 10;
 
 const ERRORS: Record<string, string> = {
-  wrong_password: 'Senha incorreta.',
-  short_password: `Use pelo menos ${MIN_PASSWORD} caracteres.`,
-  rate_limited: 'Muitas tentativas. Aguarde um minuto.',
-  already_configured: 'O painel já tem senha. Recarregue a página e entre.',
-  forbidden_host: 'Abra o painel pelo endereço http://127.0.0.1:8099.',
-  tor_unavailable: 'Sem resposta do Tor.',
-  tor_auth_failed: 'O Tor recusou o acesso do painel.',
-  relay_unavailable: 'Sem resposta do relay.',
-  wrong_passphrase: 'Senha do backup incorreta.',
-  bad_backup: 'Este arquivo não é um backup de endereço do Privatum.',
-  bad_key_files: 'O backup está corrompido: a chave não tem o formato do Tor.',
-  key_mismatch: 'O backup está corrompido: a chave não corresponde ao endereço. Nada foi alterado.',
-  bad_hostname: 'O backup tem um endereço inválido. Nada foi alterado.',
-  no_key_yet: 'O Tor ainda não criou a chave. Tente em alguns segundos.',
-  cannot_save: 'Não foi possível gravar a chave.',
-  cannot_delete: 'Não foi possível apagar a chave atual.',
-  bad_invite_limits: 'Use de 1 a 100 usos e de 1 a 30 dias.',
-  too_many_invites: 'Há convites demais ativos. Revogue alguns antes.',
+  wrong_password: t('Senha incorreta.'),
+  short_password: t('Use pelo menos {n} caracteres.', { n: MIN_PASSWORD }),
+  rate_limited: t('Muitas tentativas. Aguarde um minuto.'),
+  already_configured: t('O painel já tem senha. Recarregue a página e entre.'),
+  forbidden_host: t('Abra o painel pelo endereço http://127.0.0.1:8099.'),
+  tor_unavailable: t('Sem resposta do Tor.'),
+  tor_auth_failed: t('O Tor recusou o acesso do painel.'),
+  relay_unavailable: t('Sem resposta do relay.'),
+  wrong_passphrase: t('Senha do backup incorreta.'),
+  bad_backup: t('Este arquivo não é um backup de endereço do Privatum.'),
+  bad_key_files: t('O backup está corrompido: a chave não tem o formato do Tor.'),
+  key_mismatch: t('O backup está corrompido: a chave não corresponde ao endereço. Nada foi alterado.'),
+  bad_hostname: t('O backup tem um endereço inválido. Nada foi alterado.'),
+  no_key_yet: t('O Tor ainda não criou a chave. Tente em alguns segundos.'),
+  cannot_save: t('Não foi possível gravar a chave.'),
+  cannot_delete: t('Não foi possível apagar a chave atual.'),
+  bad_invite_limits: t('Use de 1 a 100 usos e de 1 a 30 dias.'),
+  too_many_invites: t('Há convites demais ativos. Revogue alguns antes.'),
 };
-const describe = (code: string) => ERRORS[code] ?? `Erro: ${code}`;
+const describe = (code: string) => ERRORS[code] ?? t('Erro: {code}', { code });
 
 async function api<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
@@ -69,9 +70,17 @@ export function Admin() {
   }, []);
 
   if (error) return <Shell><p className="notice danger">{error}</p></Shell>;
-  if (!session) return <Shell><p className="muted">Carregando…</p></Shell>;
+  if (!session) return <Shell><p className="muted">{t('Carregando…')}</p></Shell>;
   if (!session.logged_in) return <Shell><Login setup={!session.configured} onDone={refresh} /></Shell>;
   return <Dashboard onLogout={refresh} />;
+}
+
+function LangSwitch() {
+  return (
+    <button className="btn quiet lang-switch" onClick={() => setLang(lang() === 'en' ? 'pt' : 'en')}>
+      {lang() === 'en' ? 'Português' : 'English'}
+    </button>
+  );
 }
 
 function Shell({ children }: { children: ReactNode }) {
@@ -80,9 +89,10 @@ function Shell({ children }: { children: ReactNode }) {
       <div className="welcome-mark">
         <h1 className="brandmark">
           <Logo size={72} />
-          <span className="wordmark admin-wordmark">Painel</span>
+          <span className="wordmark admin-wordmark">{t('Painel')}</span>
         </h1>
-        <p className="tagline">Gerenciamento local da sua instância. Só abre neste computador.</p>
+        <p className="tagline">{t('Gerenciamento local da sua instância. Só abre neste computador.')}</p>
+        <LangSwitch />
       </div>
       {children}
     </main>
@@ -99,7 +109,7 @@ function Login({ setup, onDone }: { setup: boolean; onDone: () => void }) {
     e.preventDefault();
     setError('');
     if (setup && password.length < MIN_PASSWORD) return setError(ERRORS.short_password);
-    if (setup && password !== confirm) return setError('As senhas não coincidem.');
+    if (setup && password !== confirm) return setError(t('As senhas não coincidem.'));
     setBusy(true);
     try {
       await api(setup ? '/api/setup' : '/api/login', { password });
@@ -113,24 +123,24 @@ function Login({ setup, onDone }: { setup: boolean; onDone: () => void }) {
 
   return (
     <form className="panel gate" onSubmit={submit}>
-      <h2>{setup ? 'Criar a senha do painel' : 'Entrar no painel'}</h2>
+      <h2>{setup ? t('Criar a senha do painel') : t('Entrar no painel')}</h2>
       {setup && (
         <p className="muted">
-          Primeiro acesso. Esta senha protege o gerenciamento da instância (endereço, chave, contas). Não é a senha das suas conversas.
+          {t('Primeiro acesso. Esta senha protege o gerenciamento da instância (endereço, chave, contas). Não é a senha das suas conversas.')}
         </p>
       )}
       <label className="field">
-        <span>Senha do painel</span>
+        <span>{t('Senha do painel')}</span>
         <input type="password" autoComplete={setup ? 'new-password' : 'current-password'} value={password} onChange={(e) => setPassword(e.target.value)} autoFocus />
       </label>
       {setup && (
         <label className="field">
-          <span>Repita a senha</span>
+          <span>{t('Repita a senha')}</span>
           <input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
         </label>
       )}
       {error && <p className="notice danger" role="alert">{error}</p>}
-      <button className="btn primary" disabled={busy}>{busy ? 'Conferindo…' : setup ? 'Criar senha e entrar' : 'Entrar'}</button>
+      <button className="btn primary" disabled={busy}>{busy ? t('Conferindo…') : setup ? t('Criar senha e entrar') : t('Entrar')}</button>
     </form>
   );
 }
@@ -173,26 +183,27 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       <header className="admin-head">
         <div className="brandmark">
           <Logo size={30} />
-          <strong>Privatum</strong>
-          <span className="muted">Painel</span>
+          <strong>{t('Privatum')}</strong>
+          <span className="muted">{t('Painel')}</span>
         </div>
-        <button className="icon-btn" title="Sair do painel" aria-label="Sair do painel" onClick={logout}>
+        <LangSwitch />
+        <button className="icon-btn" title={t('Sair do painel')} aria-label={t('Sair do painel')} onClick={logout}>
           <Icon name="logout" />
         </button>
       </header>
       {error && !restarting && <p className="notice danger" role="alert">{error}</p>}
       {restarting && (
         <p className="notice warn" role="status">
-          Reiniciando o Tor com a chave {restart?.to ? 'restaurada' : 'nova'}… Leva de alguns segundos a um minuto.
+          {restart?.to ? t('Reiniciando o Tor com a chave restaurada… Leva de alguns segundos a um minuto.') : t('Reiniciando o Tor com a chave nova… Leva de alguns segundos a um minuto.')}
         </p>
       )}
       {restart && !restarting && (
         <p className="notice ok" role="status">
-          Pronto: a instância responde em {status?.onion}. A rede Tor pode levar alguns minutos para encontrar o endereço.
+          {t('Pronto: a instância responde em {onion}. A rede Tor pode levar alguns minutos para encontrar o endereço.', { onion: status?.onion ?? '' })}
         </p>
       )}
       {!status ? (
-        <p className="muted">Carregando…</p>
+        <p className="muted">{t('Carregando…')}</p>
       ) : (
         <div className="admin-grid">
           <Address onion={status.onion} />
@@ -219,14 +230,14 @@ function Address({ onion }: { onion: string | null }) {
   const [copied, setCopied] = useState(false);
   if (!onion) {
     return (
-      <Card title="Endereço da instância">
-        <p className="muted">O Tor ainda está criando o endereço. Isso leva alguns segundos na primeira vez.</p>
+      <Card title={t('Endereço da instância')}>
+        <p className="muted">{t('O Tor ainda está criando o endereço. Isso leva alguns segundos na primeira vez.')}</p>
       </Card>
     );
   }
   const url = `http://${onion}`;
   return (
-    <Card title="Endereço da instância">
+    <Card title={t('Endereço da instância')}>
       <code className="onion">{url}</code>
       <div className="row">
         <button
@@ -237,12 +248,12 @@ function Address({ onion }: { onion: string | null }) {
             setTimeout(() => setCopied(false), 2000);
           }}
         >
-          <Icon name={copied ? 'check' : 'link'} /> {copied ? 'Copiado' : 'Copiar endereço'}
+          <Icon name={copied ? 'check' : 'link'} /> {copied ? t('Copiado') : t('Copiar endereço')}
         </button>
       </div>
       <Qr text={url} />
       <p className="hint">
-        Abra no Tor Browser (nível Standard) e crie sua identidade. Para convidar alguém, use “Meu convite” dentro do app, não este endereço sozinho.
+        {t('Abra no Tor Browser (nível Standard) e crie sua identidade. Para convidar alguém, use “Meu convite” dentro do app, não este endereço sozinho.')}
       </p>
     </Card>
   );
@@ -252,21 +263,21 @@ function Health({ status }: { status: Status }) {
   const { tor, relay } = status;
   const torReady = tor.ok && tor.progress === 100;
   return (
-    <Card title="Status">
+    <Card title={t('Status')}>
       <dl className="kv">
-        <dt>Tor</dt>
+        <dt>{t('Tor')}</dt>
         <dd>
           {tor.ok ? (
-            <span className={`tag ${torReady ? 'ok' : 'warn'}`}>{torReady ? 'conectado' : `conectando ${tor.progress}%`}</span>
+            <span className={`tag ${torReady ? 'ok' : 'warn'}`}>{torReady ? t('conectado') : t('conectando {p}%', { p: tor.progress ?? 0 })}</span>
           ) : (
             <span className="tag warn">{describe(tor.error ?? '')}</span>
           )}
         </dd>
-        <dt>Relay</dt>
+        <dt>{t('Relay')}</dt>
         <dd>
-          <span className={`tag ${relay.ok ? 'ok' : 'warn'}`}>{relay.ok ? 'no ar' : describe(relay.error ?? '')}</span>
+          <span className={`tag ${relay.ok ? 'ok' : 'warn'}`}>{relay.ok ? t('no ar') : describe(relay.error ?? '')}</span>
         </dd>
-        <dt>Versão</dt>
+        <dt>{t('Versão')}</dt>
         <dd className="mono">{status.version}</dd>
       </dl>
       {tor.ok && !torReady && tor.summary && <p className="hint">{tor.summary}</p>}
@@ -277,22 +288,22 @@ function Health({ status }: { status: Status }) {
 function Usage({ relay }: { relay: Status['relay'] }) {
   if (!relay.ok) return null;
   return (
-    <Card title="Uso">
+    <Card title={t('Uso')}>
       <dl className="kv">
-        <dt>Pessoas registradas</dt>
+        <dt>{t('Pessoas registradas')}</dt>
         <dd>
-          {relay.mailboxes} <span className="muted">de {relay.max_mailboxes}</span>
+          {relay.mailboxes} <span className="muted">{t('de')}{' '}{relay.max_mailboxes}</span>
         </dd>
-        <dt>Mensagens aguardando entrega</dt>
+        <dt>{t('Mensagens aguardando entrega')}</dt>
         <dd>
           {relay.messages} <span className="muted">({bytes(relay.message_bytes)})</span>
         </dd>
-        <dt>Banco de dados</dt>
+        <dt>{t('Banco de dados')}</dt>
         <dd>{bytes(relay.db_bytes)}</dd>
-        <dt>Mensagens não entregues expiram em</dt>
-        <dd>{relay.message_ttl_days} dias</dd>
+        <dt>{t('Mensagens não entregues expiram em')}</dt>
+        <dd>{t('{n} dias', { n: relay.message_ttl_days ?? 0 })}</dd>
       </dl>
-      <p className="hint">Só contagens: o painel não vê conteúdo, nomes nem quem conversa com quem.</p>
+      <p className="hint">{t('Só contagens: o painel não vê conteúdo, nomes nem quem conversa com quem.')}</p>
     </Card>
   );
 }
@@ -317,21 +328,21 @@ function OnionKey({ onion, onRestart }: { onion: string | null; onRestart: (to?:
   const [dialog, setDialog] = useState<'backup' | 'restore' | 'rotate' | null>(null);
   const close = () => setDialog(null);
   return (
-    <Card title="Chave do endereço">
+    <Card title={t('Chave do endereço')}>
       <p className="muted">
-        O endereço .onion vem desta chave. Guarde um backup fora deste computador: sem ele, perder a chave muda o endereço e quebra todos os convites.
+        {t('O endereço .onion vem desta chave. Guarde um backup fora deste computador: sem ele, perder a chave muda o endereço e quebra todos os convites.')}
       </p>
       <div className="row">
         <button className="btn primary" disabled={!onion} onClick={() => setDialog('backup')}>
-          <Icon name="download" /> Baixar backup
+          <Icon name="download" />{' '}{t('Baixar backup')}
         </button>
-        <button className="btn quiet" onClick={() => setDialog('restore')}>Restaurar backup</button>
-        <button className="btn quiet danger-text" disabled={!onion} onClick={() => setDialog('rotate')}>Trocar endereço</button>
+        <button className="btn quiet" onClick={() => setDialog('restore')}>{t('Restaurar backup')}</button>
+        <button className="btn quiet danger-text" disabled={!onion} onClick={() => setDialog('rotate')}>{t('Trocar endereço')}</button>
       </div>
-      <Modal open={dialog === 'backup'} onClose={close} title="Baixar backup da chave">
+      <Modal open={dialog === 'backup'} onClose={close} title={t('Baixar backup da chave')}>
         <BackupForm onDone={close} />
       </Modal>
-      <Modal open={dialog === 'restore'} onClose={close} title="Restaurar backup da chave">
+      <Modal open={dialog === 'restore'} onClose={close} title={t('Restaurar backup da chave')}>
         <RestoreForm
           onDone={(to) => {
             close();
@@ -339,7 +350,7 @@ function OnionKey({ onion, onRestart }: { onion: string | null; onRestart: (to?:
           }}
         />
       </Modal>
-      <Modal open={dialog === 'rotate'} onClose={close} title="Trocar o endereço .onion">
+      <Modal open={dialog === 'rotate'} onClose={close} title={t('Trocar o endereço .onion')}>
         <RotateForm
           onBackup={() => setDialog('backup')}
           onDone={() => {
@@ -378,8 +389,8 @@ function BackupForm({ onDone }: { onDone: () => void }) {
       className="stack"
       onSubmit={(e) => {
         e.preventDefault();
-        if (pass.length < MIN_BACKUP_PASSPHRASE) return setError(`Use pelo menos ${MIN_BACKUP_PASSPHRASE} caracteres.`);
-        if (pass !== confirm) return setError('As senhas não coincidem.');
+        if (pass.length < MIN_BACKUP_PASSPHRASE) return setError(t('Use pelo menos {n} caracteres.', { n: MIN_BACKUP_PASSPHRASE }));
+        if (pass !== confirm) return setError(t('As senhas não coincidem.'));
         void run(async () => {
           await exportBackup(pass);
           onDone();
@@ -387,18 +398,18 @@ function BackupForm({ onDone }: { onDone: () => void }) {
       }}
     >
       <p className="muted">
-        O arquivo sai cifrado com esta senha, que não fica guardada em lugar nenhum. Quem tiver o arquivo <strong>e</strong> a senha pode se passar pela sua instância.
+        {t('O arquivo sai cifrado com esta senha, que não fica guardada em lugar nenhum. Quem tiver o arquivo')}{' '}<strong>{t('e')}</strong>{' '}{t('a senha pode se passar pela sua instância.')}
       </p>
       <label className="field">
-        <span>Senha do backup</span>
+        <span>{t('Senha do backup')}</span>
         <input type="password" autoComplete="new-password" value={pass} onChange={(e) => setPass(e.target.value)} />
       </label>
       <label className="field">
-        <span>Repita a senha</span>
+        <span>{t('Repita a senha')}</span>
         <input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
       </label>
       {error && <p className="notice danger" role="alert">{error}</p>}
-      <button className="btn primary" disabled={busy}>{busy ? 'Cifrando…' : 'Baixar backup cifrado'}</button>
+      <button className="btn primary" disabled={busy}>{busy ? t('Cifrando…') : t('Baixar backup cifrado')}</button>
     </form>
   );
 }
@@ -412,7 +423,7 @@ function RestoreForm({ onDone }: { onDone: (to: string) => void }) {
       className="stack"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!file) return setError('Escolha o arquivo de backup.');
+        if (!file) return setError(t('Escolha o arquivo de backup.'));
         void run(async () => {
           const files = await decryptBackup(await file.text(), pass);
           await api('/api/onion/restore', files);
@@ -421,18 +432,18 @@ function RestoreForm({ onDone }: { onDone: (to: string) => void }) {
       }}
     >
       <p className="muted">
-        A instância volta a responder no endereço do backup. A chave atual é substituída: se você não tiver backup dela, o endereço atual se perde.
+        {t('A instância volta a responder no endereço do backup. A chave atual é substituída: se você não tiver backup dela, o endereço atual se perde.')}
       </p>
       <label className="field">
-        <span>Arquivo (.privatum-onion)</span>
+        <span>{t('Arquivo (.privatum-onion)')}</span>
         <input type="file" accept=".privatum-onion" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
       </label>
       <label className="field">
-        <span>Senha do backup</span>
+        <span>{t('Senha do backup')}</span>
         <input type="password" autoComplete="current-password" value={pass} onChange={(e) => setPass(e.target.value)} />
       </label>
       {error && <p className="notice danger" role="alert">{error}</p>}
-      <button className="btn primary" disabled={busy}>{busy ? 'Conferindo a chave…' : 'Restaurar e reiniciar o Tor'}</button>
+      <button className="btn primary" disabled={busy}>{busy ? t('Conferindo a chave…') : t('Restaurar e reiniciar o Tor')}</button>
     </form>
   );
 }
@@ -452,18 +463,17 @@ function RotateForm({ onBackup, onDone }: { onBackup: () => void; onDone: () => 
       }}
     >
       <p className="notice danger">
-        A chave atual é apagada e o Tor cria um endereço novo. <strong>Todos os convites param de funcionar</strong> e cada pessoa precisa restaurar o
-        próprio backup do Privatum no endereço novo. Sem um backup da chave, não há como voltar ao endereço atual.
+        {t('A chave atual é apagada e o Tor cria um endereço novo.')}{' '}<strong>{t('Todos os convites param de funcionar')}</strong>{' '}{t('e cada pessoa precisa restaurar o próprio backup do Privatum no endereço novo. Sem um backup da chave, não há como voltar ao endereço atual.')}
       </p>
       <button type="button" className="btn quiet" onClick={onBackup}>
-        <Icon name="download" /> Baixar backup da chave atual antes
+        <Icon name="download" />{' '}{t('Baixar backup da chave atual antes')}
       </button>
       <label className="field">
-        <span>Para confirmar, digite TROCAR</span>
+        <span>{t('Para confirmar, digite TROCAR')}</span>
         <input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />
       </label>
       {error && <p className="notice danger" role="alert">{error}</p>}
-      <button className="btn danger" disabled={busy || typed !== 'TROCAR'}>{busy ? 'Trocando…' : 'Apagar a chave e trocar o endereço'}</button>
+      <button className="btn danger" disabled={busy || typed !== 'TROCAR'}>{busy ? t('Trocando…') : t('Apagar a chave e trocar o endereço')}</button>
     </form>
   );
 }
@@ -474,16 +484,16 @@ interface AccessData {
   mailboxes: { id: string; created_at: number; pending: number }[];
 }
 
-const date = (unix: number) => new Date(unix * 1000).toLocaleDateString([], { day: '2-digit', month: '2-digit', year: 'numeric' });
+const date = (unix: number) => new Date(unix * 1000).toLocaleDateString(lang() === 'en' ? 'en-US' : 'pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
 const MODES: { value: AccessData['registration']; label: string; help: string }[] = [
-  { value: 'open', label: 'Aberta', help: 'Qualquer pessoa que tenha o endereço pode criar uma identidade aqui.' },
+  { value: 'open', label: t('Aberta'), help: t('Qualquer pessoa que tenha o endereço pode criar uma identidade aqui.') },
   {
     value: 'invite',
-    label: 'Só convidados',
-    help: 'Precisa de um código: o “Meu convite” de quem já participa leva um (uso único, 7 dias), ou um convite criado aqui.',
+    label: t('Só convidados'),
+    help: t('Precisa de um código: o “Meu convite” de quem já participa leva um (uso único, 7 dias), ou um convite criado aqui.'),
   },
-  { value: 'closed', label: 'Fechada', help: 'Ninguém novo entra. Quem já participa continua normalmente.' },
+  { value: 'closed', label: t('Fechada'), help: t('Ninguém novo entra. Quem já participa continua normalmente.') },
 ];
 
 /** Grid wraps cards, so this one spans the full width to fit its tables. */
@@ -505,8 +515,8 @@ function Access() {
   const memberInvites = data.invites.length - adminInvites.length;
   return (
     <>
-      <Card title="Quem pode entrar">
-        <div className="modes" role="radiogroup" aria-label="Quem pode criar identidade nesta instância">
+      <Card title={t('Quem pode entrar')}>
+        <div className="modes" role="radiogroup" aria-label={t('Quem pode criar identidade nesta instância')}>
           {MODES.map((mode) => (
             <label key={mode.value} className={`mode ${data.registration === mode.value ? 'active' : ''}`}>
               <input
@@ -548,8 +558,8 @@ function Invites({
   const [copied, setCopied] = useState(false);
   const { busy, error, run } = useAction();
   return (
-    <Card title="Convites do painel">
-      {registration !== 'invite' && <p className="hint">Os códigos só são exigidos no modo “Só convidados”.</p>}
+    <Card title={t('Convites do painel')}>
+      {registration !== 'invite' && <p className="hint">{t('Os códigos só são exigidos no modo “Só convidados”.')}</p>}
       <form
         className="invite-form"
         onSubmit={(e) => {
@@ -563,19 +573,19 @@ function Invites({
         }}
       >
         <label className="field">
-          <span>Usos</span>
+          <span>{t('Usos')}</span>
           <input type="number" min={1} max={100} value={uses} onChange={(e) => setUses(Number(e.target.value))} />
         </label>
         <label className="field">
-          <span>Vale por (dias)</span>
+          <span>{t('Vale por (dias)')}</span>
           <input type="number" min={1} max={30} value={days} onChange={(e) => setDays(Number(e.target.value))} />
         </label>
-        <button className="btn primary" disabled={busy}>Criar convite</button>
+        <button className="btn primary" disabled={busy}>{t('Criar convite')}</button>
       </form>
       {error && <p className="notice danger" role="alert">{error}</p>}
       {created && (
         <div className="stack">
-          <p className="notice ok">Copie agora: o link não é mostrado de novo (a instância guarda só uma impressão do código).</p>
+          <p className="notice ok">{t('Copie agora: o link não é mostrado de novo (a instância guarda só uma impressão do código).')}</p>
           <code className="onion">{created}</code>
           <div className="row">
             <button
@@ -585,20 +595,20 @@ function Invites({
                 setCopied(true);
               }}
             >
-              <Icon name={copied ? 'check' : 'link'} /> {copied ? 'Copiado' : 'Copiar link'}
+              <Icon name={copied ? 'check' : 'link'} /> {copied ? t('Copiado') : t('Copiar link')}
             </button>
           </div>
           <Qr text={created} />
-          <p className="hint">Quem abrir este link no Tor Browser cria a identidade já com o código. Ele não adiciona você como contato.</p>
+          <p className="hint">{t('Quem abrir este link no Tor Browser cria a identidade já com o código. Ele não adiciona você como contato.')}</p>
         </div>
       )}
       {adminInvites.length > 0 && (
         <table className="table">
           <thead>
             <tr>
-              <th>Código</th>
-              <th>Usos restantes</th>
-              <th>Expira</th>
+              <th>{t('Código')}</th>
+              <th>{t('Usos restantes')}</th>
+              <th>{t('Expira')}</th>
               <th />
             </tr>
           </thead>
@@ -610,7 +620,7 @@ function Invites({
                 <td>{date(i.expires_at)}</td>
                 <td>
                   <button className="btn quiet danger-text small" onClick={() => api('/api/access/invites/revoke', { id: i.id }).then(onChange)}>
-                    Revogar
+                    {t('Revogar')}
                   </button>
                 </td>
               </tr>
@@ -618,7 +628,7 @@ function Invites({
           </tbody>
         </table>
       )}
-      {memberInvites > 0 && <p className="hint">Mais {memberInvites} convite(s) de membros ainda não usado(s).</p>}
+      {memberInvites > 0 && <p className="hint">{t('Mais {n} convite(s) de membros ainda não usado(s).', { n: memberInvites })}</p>}
     </Card>
   );
 }
@@ -627,17 +637,17 @@ function Accounts({ mailboxes, onChange }: { mailboxes: AccessData['mailboxes'];
   const [removing, setRemoving] = useState<string | null>(null);
   const { busy, error, run } = useAction();
   return (
-    <Card title={`Contas (${mailboxes.length})`}>
+    <Card title={t('Contas ({n})', { n: mailboxes.length })}>
       <p className="hint">
-        Cada conta aparece só pelo identificador da caixa (o mesmo que vai no convite da pessoa). O painel não sabe nomes nem quem conversa com quem.
+        {t('Cada conta aparece só pelo identificador da caixa (o mesmo que vai no convite da pessoa). O painel não sabe nomes nem quem conversa com quem.')}
       </p>
       {mailboxes.length > 0 && (
         <table className="table">
           <thead>
             <tr>
-              <th>Caixa</th>
-              <th>Criada</th>
-              <th>Aguardando</th>
+              <th>{t('Caixa')}</th>
+              <th>{t('Criada')}</th>
+              <th>{t('Aguardando')}</th>
               <th />
             </tr>
           </thead>
@@ -648,20 +658,19 @@ function Accounts({ mailboxes, onChange }: { mailboxes: AccessData['mailboxes'];
                 <td>{date(mb.created_at)}</td>
                 <td>{mb.pending}</td>
                 <td>
-                  <button className="btn quiet danger-text small" onClick={() => setRemoving(mb.id)}>Remover</button>
+                  <button className="btn quiet danger-text small" onClick={() => setRemoving(mb.id)}>{t('Remover')}</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
-      <Modal open={removing !== null} onClose={() => setRemoving(null)} title="Remover conta">
+      <Modal open={removing !== null} onClose={() => setRemoving(null)} title={t('Remover conta')}>
         <div className="stack">
           <p className="muted">
-            Apaga desta instância a caixa <code className="mono">{removing?.slice(0, 10)}…</code>, as chaves públicas dela e as mensagens que ainda
-            esperavam entrega. Os contatos deixam de conseguir escrever para ela. As conversas guardadas no navegador da pessoa não são apagadas.
+            {t('Apaga desta instância a caixa')}{' '}<code className="mono">{removing?.slice(0, 10)}…</code>{t(', as chaves públicas dela e as mensagens que ainda esperavam entrega. Os contatos deixam de conseguir escrever para ela. As conversas guardadas no navegador da pessoa não são apagadas.')}
           </p>
-          <p className="hint">Com a instância aberta, a pessoa pode voltar sozinha; nos outros modos, precisa de um convite novo.</p>
+          <p className="hint">{t('Com a instância aberta, a pessoa pode voltar sozinha; nos outros modos, precisa de um convite novo.')}</p>
           {error && <p className="notice danger" role="alert">{error}</p>}
           <button
             className="btn danger"
@@ -674,7 +683,7 @@ function Accounts({ mailboxes, onChange }: { mailboxes: AccessData['mailboxes'];
               })
             }
           >
-            Remover conta
+            {t('Remover conta')}
           </button>
         </div>
       </Modal>

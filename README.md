@@ -129,6 +129,10 @@ O backup é cifrado com a sua senha local; quem tiver o arquivo pode tentar adiv
 - **Grupo** (ao lado de "Nova conversa") cria um grupo com até 19 contatos seus. Cada mensagem é cifrada separadamente para cada membro; a instância não sabe que o grupo existe.
 - Só quem criou o grupo adiciona ou remove pessoas. Qualquer um pode sair. Os membros veem a lista e as mensagens de todos, inclusive de quem não é seu contato (aparece pelo nome que escolheu, marcado como "não é seu contato"). Para conferir a identidade de alguém, adicione o convite dessa pessoa e compare o código de segurança.
 
+### Idioma
+
+O app e o painel estão em português e inglês. O botão **English / Português** fica na primeira tela, na janela "Como funciona" (?) e no topo do painel. A escolha fica guardada só neste navegador. O idioma não é detectado sozinho: o Tor Browser informa inglês a todos os sites, para não identificar quem usa pelo idioma.
+
 ### Convite por QR, nome repetido e busca
 
 - **Meu convite** mostra também um QR code. Se a câmera do celular abrir outro navegador, copie o link e cole no Tor Browser: endereços `.onion` só abrem nele.

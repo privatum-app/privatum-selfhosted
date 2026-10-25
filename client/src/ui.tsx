@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import qrcode from 'qrcode-generator';
+import { t } from './i18n.ts';
 
 const B32 = 'abcdefghijklmnopqrstuvwxyz234567';
 
@@ -248,7 +249,7 @@ export function Qr({ text }: { text: string }) {
   let d = '';
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
   return (
-    <svg className="qr" viewBox={`-4 -4 ${n + 8} ${n + 8}`} role="img" aria-label="QR code do link">
+    <svg className="qr" viewBox={`-4 -4 ${n + 8} ${n + 8}`} role="img" aria-label={t('QR code do link')}>
       <rect x="-4" y="-4" width={n + 8} height={n + 8} fill="#fff" />
       <path d={d} fill="#000" />
     </svg>
@@ -332,7 +333,7 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
       <div className="modal-body">
         <header className="modal-head">
           <h2 id={titleId}>{title}</h2>
-          <button type="button" className="icon-btn" aria-label="Fechar" onClick={onClose}>
+          <button type="button" className="icon-btn" aria-label={t('Fechar')} onClick={onClose}>
             <Icon name="x" />
           </button>
         </header>

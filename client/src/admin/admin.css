@@ -1,6 +1,6 @@
 /* Local admin panel. Builds on the app's tokens and components in styles.css. */
 .admin { max-width: 1100px; margin: 0 auto; padding: 1rem 16px 3rem; display: grid; gap: 1rem; }
-.admin-head { display: flex; align-items: center; justify-content: space-between; padding: 0.25rem 0 0.5rem; border-bottom: 1px solid var(--line); }
+.admin-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0 0.5rem; border-bottom: 1px solid var(--line); }
 .admin-head .brandmark { gap: 0.6rem; font-size: 1.1rem; }
 .admin-wordmark { font-size: 3rem; }
 .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 1rem; align-items: start; }
@@ -24,3 +24,4 @@
 .table th { text-align: left; color: var(--muted); font-weight: 500; padding: 0.4rem 0.25rem; border-bottom: 1px solid var(--line); }
 .table td { padding: 0.45rem 0.25rem; border-bottom: 1px solid var(--line); }
 .btn.small { min-height: 32px; padding: 0 0.6rem; font-size: 0.85rem; }
+.admin-head .brandmark { margin-right: auto; }
