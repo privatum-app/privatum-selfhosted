@@ -253,8 +253,6 @@ export const EN: Record<string, string> = {
   'Para confirmar, digite TROCAR': 'To confirm, type TROCAR',
   'Trocando…': 'Changing…',
   'Apagar a chave e trocar o endereço': 'Delete the key and change the address',
-  'Contas ({n})': 'Accounts ({n})',
-  'Cada conta aparece só pelo identificador da caixa (o mesmo que vai no convite da pessoa). O painel não sabe nomes nem quem conversa com quem.': 'Each account shows only by its mailbox id (the same one in the person\'s invite). The panel knows no names nor who talks to whom.',
   'Caixa': 'Mailbox',
   'Criada': 'Created',
   'Aguardando': 'Waiting',
@@ -299,6 +297,8 @@ export const EN: Record<string, string> = {
   '{n} dias': '{n} days',
   'Esta pode ser a sua própria conta. O painel não sabe de quem é cada caixa.': 'This may be your own account. The panel does not know whose each mailbox is.',
   'Para conferir se é a sua: no Privatum, abra “Meu convite”; o identificador da sua caixa é o texto depois de “#c=” no link. Compare com o de cima.': 'To check whether it is yours: in Privatum, open “My invite”; your mailbox id is the text after “#c=” in the link. Compare it with the one above.',
-  'Remover apaga desta instância as chaves públicas da caixa e as mensagens que esperavam entrega, que se perdem. Até a pessoa abrir o Privatum de novo, ninguém consegue escrever para ela; ao desbloquear, a conta é recriada sozinha. As conversas no navegador dela não são apagadas.': 'Removing deletes the mailbox\'s public keys from this instance, and the messages awaiting delivery are lost. Until the person opens Privatum again nobody can write to them; when they unlock, the account is recreated on its own. The conversations in their browser are not erased.',
   'Conferi: esta caixa não é a minha, e quero removê-la': 'I checked: this mailbox is not mine, and I want to remove it',
+  'Contas registradas ({n})': 'Registered accounts ({n})',
+  'Todas as identidades já criadas nesta instância, online ou não, pelo identificador da caixa (o mesmo que vai no convite da pessoa). A instância não registra quem está online, nem nomes ou quem conversa com quem.': 'Every identity ever created on this instance, online or not, by mailbox id (the same one in the person\'s invite). The instance does not record who is online, nor names or who talks to whom.',
+  'Remover apaga desta instância as chaves públicas da caixa e as mensagens que esperavam entrega, que se perdem. Não impede a pessoa de voltar: ao desbloquear o Privatum, a conta é recriada sozinha. Serve para limpar contas abandonadas ou de teste. Para manter alguém fora, troque o endereço da instância. As conversas no navegador dela não são apagadas.': 'Removing deletes the mailbox\'s public keys from this instance, and the messages awaiting delivery are lost. It does not keep the person out: when they unlock Privatum, the account is recreated on its own. Use it to clean up abandoned or test accounts. To keep someone out, change the instance address. The conversations in their browser are not erased.',
 };

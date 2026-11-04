@@ -518,9 +518,9 @@ function Accounts({ mailboxes, onChange }: { mailboxes: AccessData['mailboxes'];
     setSure(false);
   };
   return (
-    <Card title={t('Contas ({n})', { n: mailboxes.length })} wide>
+    <Card title={t('Contas registradas ({n})', { n: mailboxes.length })} wide>
       <p className="hint">
-        {t('Cada conta aparece só pelo identificador da caixa (o mesmo que vai no convite da pessoa). O painel não sabe nomes nem quem conversa com quem.')}
+        {t('Todas as identidades já criadas nesta instância, online ou não, pelo identificador da caixa (o mesmo que vai no convite da pessoa). A instância não registra quem está online, nem nomes ou quem conversa com quem.')}
       </p>
       {mailboxes.length > 0 && (
         <table className="table">
@@ -556,7 +556,7 @@ function Accounts({ mailboxes, onChange }: { mailboxes: AccessData['mailboxes'];
             {t('Para conferir se é a sua: no Privatum, abra “Meu convite”; o identificador da sua caixa é o texto depois de “#c=” no link. Compare com o de cima.')}
           </p>
           <p className="muted">
-            {t('Remover apaga desta instância as chaves públicas da caixa e as mensagens que esperavam entrega, que se perdem. Até a pessoa abrir o Privatum de novo, ninguém consegue escrever para ela; ao desbloquear, a conta é recriada sozinha. As conversas no navegador dela não são apagadas.')}
+            {t('Remover apaga desta instância as chaves públicas da caixa e as mensagens que esperavam entrega, que se perdem. Não impede a pessoa de voltar: ao desbloquear o Privatum, a conta é recriada sozinha. Serve para limpar contas abandonadas ou de teste. Para manter alguém fora, troque o endereço da instância. As conversas no navegador dela não são apagadas.')}
           </p>
           <label className="check">
             <input type="checkbox" checked={sure} onChange={(e) => setSure(e.target.checked)} />

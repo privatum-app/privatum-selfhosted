@@ -125,7 +125,7 @@ O painel só abre **neste computador** (`127.0.0.1:8099`); pelo `.onion` ningué
 | **Chave do endereço** | **Baixar backup** cifrado da chave (guarde fora do computador), **Restaurar backup** e **Trocar endereço**. Na restauração, o painel confere se a chave corresponde ao endereço antes de gravar. |
 | **Status** | Se o Tor está conectado e o relay no ar, e a versão instalada. |
 | **Uso** | Pessoas registradas, mensagens aguardando entrega, tamanho do banco e prazo de expiração. |
-| **Contas** | As caixas registradas, pelo identificador. **Remover** apaga a caixa e as mensagens pendentes dela. |
+| **Contas registradas** | Todas as identidades já criadas na instância, online ou não, pelo identificador da caixa. A instância não registra quem está online. **Remover** apaga a caixa e as mensagens pendentes dela, mas **não impede a pessoa de voltar**: ao desbloquear o Privatum, a conta é recriada. Serve para limpar contas abandonadas ou de teste; para manter alguém fora, troque o endereço. |
 
 <table>
 <tr>
