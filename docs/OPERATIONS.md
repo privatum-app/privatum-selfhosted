@@ -133,13 +133,13 @@ O serviço é configurado com 5 pontos de introdução (o padrão do Tor é 3), 
 
 As imagens publicadas (`ghcr.io/privatum-app/privatum-relay` e `ghcr.io/privatum-app/privatum-tor`) são compiladas pelo GitHub Actions (`.github/workflows/release.yml`), assinadas com **cosign** sem chave guardada (identidade OIDC do workflow) e acompanhadas de **SBOM** e de proveniência do build. O `compose.yaml` do pacote fixa cada imagem pelo digest, então o Docker recusa uma imagem trocada.
 
-Para conferir a assinatura (troque a versão):
+Para conferir a assinatura, use o **cosign 3** ou mais novo (troque a versão). Desde a v0.2.0 as imagens são assinadas com o cosign 3, que guarda a assinatura num formato novo: o cosign 2 responde “no signatures found” mesmo com a assinatura lá.
 
 ```bash
-cosign verify ghcr.io/privatum-app/privatum-relay:v0.1.0 --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp '^https://github.com/privatum-app/privatum-selfhosted/\.github/workflows/release\.yml@refs/tags/v'
+cosign verify ghcr.io/privatum-app/privatum-relay:v0.2.0 --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp '^https://github.com/privatum-app/privatum-selfhosted/\.github/workflows/release\.yml@refs/tags/v'
 ```
 
-Repita com `privatum-tor`. Para ver o SBOM: `docker buildx imagetools inspect ghcr.io/privatum-app/privatum-relay:v0.1.0 --format '{{ json .SBOM }}'`.
+Repita com `privatum-tor`. O resultado esperado inclui “The cosign claims were validated”; com outra identidade no lugar da do workflow, a verificação tem que falhar. Para ver o SBOM: `docker buildx imagetools inspect ghcr.io/privatum-app/privatum-relay:v0.2.0 --format '{{ json .SBOM }}'`.
 
 ## Atualizar
 
