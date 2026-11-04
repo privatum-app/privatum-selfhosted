@@ -6,7 +6,7 @@
 
 FROM debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587
 
-ARG TOR_VERSION=0.4.9.14-1~d12.bookworm+1
+ARG TOR_VERSION=0.4.9.15-1~d12.bookworm+1
 # Tor Project archive signing key (https://support.torproject.org/apt/).
 ARG TOR_KEY_FPR=A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89
 
