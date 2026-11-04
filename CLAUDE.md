@@ -6,9 +6,9 @@ Chat com criptografia de ponta a ponta que qualquer pessoa sobe com `docker comp
 
 | Pasta | O que é |
 |---|---|
-| `relay/` | Relay em Rust (axum + SQLite). Guarda e entrega envelopes cifrados; nunca recebe senha nem chave privada. |
+| `relay/` | Relay em Rust (axum + SQLite). Guarda e entrega envelopes cifrados; nunca recebe senha nem chave privada. O painel local (`src/bin/privatum-admin.rs`) roda da mesma imagem. |
 | `crypto-wasm/` | Cola `wasm-bindgen` sobre o vodozemac (Olm/Double Ratchet). Nenhuma criptografia própria. |
-| `client/` | Cliente web React. A lógica fica em `client/src/core/` (sem React, roda também no Node). |
+| `client/` | Cliente web e painel em React (`src/admin/`). A lógica fica em `client/src/core/` (sem React, roda também no Node). |
 | `deploy/` | `relay.Dockerfile` (imagem única: WASM + cliente + relay), `tor.Dockerfile`, `torrc`, `compose.yaml`. |
 | `docs/` | `THREAT-MODEL.md` (adversários, limites L1–L8, requisitos R1–R10), `PROTOCOL.md`, `OPERATIONS.md`. |
 
@@ -43,7 +43,10 @@ Rust não está instalado na máquina: tudo compila em contêiner.
 
 ## Próximos passos
 
-1. Testar build reproduzível; testar o pacote simples em Windows e Linux.
-2. Definir o canal para relatar vulnerabilidades (`SECURITY.md` está "a definir").
-3. Fase 2: app local opcional (resolve os limites L1 e L2) e reavaliar o Arti.
-4. Fase 3: auditoria externa antes de abrir ao público.
+As funcionalidades estão fechadas na **0.2.0**: daqui em diante só testes e correções do que eles encontrarem, sem funções novas.
+
+1. Publicar a release v0.2.0 (tag `v*`) e conferir o pacote simples.
+2. Testar no Tor Browser real as funções da 0.2 (grupos, respostas, reações, temporárias, busca, nome repetido, inglês) e o nível Safer.
+3. Testar o pacote simples em Windows e Linux; testar o Onion Browser no iPhone.
+4. Testar build reproduzível; definir o canal para relatar vulnerabilidades (`SECURITY.md` está "a definir").
+5. Depois: Fase 2 (app local opcional e Arti) e Fase 3 (auditoria externa antes de abrir ao público).

@@ -28,6 +28,8 @@ O aplicativo não publica porta no host. A única porta publicada é a do **pain
 
 ## Painel
 
+![Painel da instância](imagens/painel.png)
+
 O contêiner `admin` serve um painel em `http://127.0.0.1:8099`, só neste computador. No primeiro acesso você cria a senha (mínimo de 10 caracteres). Ele mostra o endereço `.onion` com QR code, o estado do Tor e do relay e contagens de uso (pessoas registradas, mensagens aguardando entrega, tamanho do banco), nunca conteúdo nem quem conversa com quem.
 
 Como ele funciona sem virar uma brecha:
