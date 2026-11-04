@@ -416,31 +416,8 @@ async fn access(State(a): State<Shared>, headers: HeaderMap) -> Response {
     a.relay_for(&headers, "/admin/access", None).await
 }
 
-async fn set_registration(State(a): State<Shared>, headers: HeaderMap, Json(body): Json<Value>) -> Response {
-    a.relay_for(&headers, "/admin/registration", Some(&body)).await
-}
-
-async fn revoke_invite(State(a): State<Shared>, headers: HeaderMap, Json(body): Json<Value>) -> Response {
-    a.relay_for(&headers, "/admin/invites/revoke", Some(&body)).await
-}
-
 async fn remove_mailbox(State(a): State<Shared>, headers: HeaderMap, Json(body): Json<Value>) -> Response {
     a.relay_for(&headers, "/admin/mailboxes/remove", Some(&body)).await
-}
-
-/// New admin code, returned once as a ready link (the relay keeps only its hash).
-async fn new_invite(State(a): State<Shared>, headers: HeaderMap, Json(body): Json<Value>) -> Response {
-    if let Err(e) = a.authed(&headers) {
-        return e;
-    }
-    let Some(onion) = a.onion() else { return err(StatusCode::SERVICE_UNAVAILABLE, "no_key_yet") };
-    match a.relay_call("/admin/invites", Some(&body)).await {
-        Ok(v) => {
-            let code = v["code"].as_str().unwrap_or_default();
-            Json(json!({ "code": code, "link": format!("http://{onion}/#r={code}") })).into_response()
-        }
-        Err(e) => (StatusCode::BAD_REQUEST, Json(json!({ "error": e }))).into_response(),
-    }
 }
 
 fn app(state: Shared, static_dir: &str) -> Router {
@@ -454,9 +431,6 @@ fn app(state: Shared, static_dir: &str) -> Router {
         .route("/api/onion/restore", post(onion_restore))
         .route("/api/onion/rotate", post(onion_rotate))
         .route("/api/access", get(access))
-        .route("/api/access/registration", post(set_registration))
-        .route("/api/access/invites", post(new_invite))
-        .route("/api/access/invites/revoke", post(revoke_invite))
         .route("/api/access/mailboxes/remove", post(remove_mailbox))
         .with_state(state);
     // Vite keeps the entry's name (admin.html); every non-asset path shows the panel.

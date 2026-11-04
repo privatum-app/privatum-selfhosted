@@ -49,9 +49,7 @@ Todas as respostas levam os cabeçalhos de R8. Tamanhos máximos e limites de ta
 
 | Método e rota | Autenticação | Função |
 |---|---|---|
-| `POST /v1/register` | assinatura | Cria a caixa: `{ed25519, curve25519, signature, invite?}`. O relay recalcula o `mailbox_id`. Caixa já existente: sempre aceita. Caixa nova: depende do modo de registro (`open`; `invite` exige um código válido, que é consumido; `closed` recusa). Erros: `invite_required`, `invalid_invite`, `registration_closed`. |
-| `GET /v1/instance` | nenhuma | `{registration}`: o modo de registro, para o cliente avisar antes de tentar. |
-| `POST /v1/invites` | token | Só no modo `invite`: gera um código de uso único válido por 7 dias para o convite do membro (`#c=<mailbox>&r=<código>`). Limite de 10 por minuto por caixa. |
+| `POST /v1/register` | assinatura | Cria a caixa: `{ed25519, curve25519, signature}`. O relay recalcula o `mailbox_id`. Idempotente: uma caixa removida pelo painel volta no próximo registro. |
 | `PUT /v1/keys` | token | Envia chaves de uso único e a chave reserva (fallback), assinadas pela Ed25519. Um lote novo de chaves de uso único **substitui** o anterior (até 100 por envio). |
 | `GET /v1/keys/{mailbox_id}` | token | Devolve identidade + **uma** chave de uso único (consumida) ou a reserva. |
 | `POST /v1/messages` | token | `{to, envelope}`. O relay grava `to`, o remetente autenticado, o horário e o blob. |
@@ -66,9 +64,7 @@ Todas as respostas levam os cabeçalhos de R8. Tamanhos máximos e limites de ta
 
 **Grupos:** não existem para o relay. Cada mensagem do grupo é cifrada separadamente para cada membro pelas sessões Olm de um para um, com o campo `g` (id aleatório do grupo) dentro do conteúdo cifrado. Tipos: `ginfo {g, name, m}` (nome e lista de membros; só é aceito de quem criou o grupo, e quem anuncia um grupo novo é o dono), `text`/`edit`/`del` com `g`, e `gleave {g}`. A lista de membros só muda por `ginfo` do dono; um membro fora da lista é ignorado, e quem sai da lista passa a ler só o histórico. Até 20 membros. O relay vê N mensagens de um para um (metadados: quem envia para quem e quando, como em qualquer conversa).
 
-**Códigos de convite:** 16 bytes aleatórios em base32 (26 caracteres). O relay guarda só o SHA-256 do código, a validade e os usos restantes, e se foi criado pelo painel ou por um membro; **não guarda quem criou nem quem usou**, para não formar um mapa de quem convidou quem. O link do painel é `#r=<código>` (só registro, sem contato).
-
-**API administrativa interna** (porta 8081, só na rede interna; o `.onion` não encaminha para ela; exige o token do painel): `GET /admin/stats`, `GET /admin/access`, `POST /admin/registration {mode}`, `POST /admin/invites {uses, days}`, `POST /admin/invites/revoke {id}`, `POST /admin/mailboxes/remove {id}`. Devolve só contagens, datas e identificadores de caixa; nunca conteúdo nem remetentes.
+**API administrativa interna** (porta 8081, só na rede interna; o `.onion` não encaminha para ela; exige o token do painel): `GET /admin/stats`, `GET /admin/access` (caixas), `POST /admin/mailboxes/remove {id}`. Devolve só contagens, datas e identificadores de caixa; nunca conteúdo nem remetentes.
 
 Envelope (JSON, tudo fora de `ciphertext` é visível ao relay):
 

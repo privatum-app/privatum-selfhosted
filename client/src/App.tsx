@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useReducer, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { inviteLink, parseInvite, parseRegistrationCode, safetyCode } from './core/identity.ts';
+import { inviteLink, parseInvite, safetyCode } from './core/identity.ts';
 import {
   AVATAR_COUNT,
   GROUP_PREFIX,
@@ -34,9 +34,6 @@ const ERRORS: Record<string, string> = {
   no_keys: t('O contato ainda não publicou chaves. Tente mais tarde.'),
   instance_full: t('Esta instância atingiu o limite de pessoas.'),
   rate_limited: t('Muitas tentativas seguidas. Aguarde um minuto.'),
-  invite_required: t('Esta instância só aceita pessoas convidadas. Abra o link de convite completo que você recebeu.'),
-  invalid_invite: t('Este convite já foi usado ou expirou. Peça um convite novo a quem te chamou.'),
-  registration_closed: t('Esta instância não está aceitando pessoas novas.'),
   bad_group_name: t('Dê um nome ao grupo.'),
   bad_group_members: t('Escolha de 1 a {n} contatos.', { n: MAX_GROUP - 1 }),
   not_owner: t('Só quem criou o grupo muda isso.'),
@@ -87,7 +84,6 @@ export function App() {
   const [messenger, setMessenger] = useState<Messenger | null>(null);
   // Read the invite once, then drop it from the address bar.
   const [pendingInvite, setPendingInvite] = useState(() => parseInvite(location.hash));
-  const [registrationCode] = useState(() => parseRegistrationCode(location.hash) ?? undefined);
   const [wasmFailed, setWasmFailed] = useState(false);
   const [tutorial, setTutorial] = useState(false);
 
@@ -109,7 +105,6 @@ export function App() {
         <Gate
           isNew={!hasIdentity}
           deps={deps}
-          invite={registrationCode}
           onReady={(m, created) => {
             setTutorial(created);
             setMessenger(m);
@@ -209,7 +204,7 @@ function Tutorial({ open, onClose }: { open: boolean; onClose: () => void }) {
   );
 }
 
-function Gate({ isNew, deps, invite, onReady }: { isNew: boolean; deps: Deps; invite?: string; onReady: (m: Messenger, created: boolean) => void }) {
+function Gate({ isNew, deps, onReady }: { isNew: boolean; deps: Deps; onReady: (m: Messenger, created: boolean) => void }) {
   const [pass, setPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
   const [backup, setBackup] = useState<File | null>(null);
@@ -228,9 +223,9 @@ function Gate({ isNew, deps, invite, onReady }: { isNew: boolean; deps: Deps; in
     try {
       onReady(
         restoring
-          ? await Messenger.importBackup(await backup!.text(), pass, deps, invite)
+          ? await Messenger.importBackup(await backup!.text(), pass, deps)
           : isNew
-            ? await Messenger.create(pass, deps, invite)
+            ? await Messenger.create(pass, deps)
             : await Messenger.unlock(pass, deps),
         creating,
       );
@@ -563,7 +558,6 @@ function Chat({
         <MyName m={m} onDone={() => setDialog(null)} />
       </Modal>
       <Modal open={dialog === 'invite'} onClose={() => setDialog(null)} title={t('Meu convite')}>
-        {/* Mounted only while open: each opening mints a new code on invite-only instances. */}
         {dialog === 'invite' && <MyInvite m={m} />}
       </Modal>
       <Modal open={dialog === 'add'} onClose={() => setDialog(null)} title={t('Nova conversa')}>
@@ -784,31 +778,13 @@ function TimerDialog({ m, threadKey, timer, open, onClose }: { m: Messenger; thr
 }
 
 function MyInvite({ m }: { m: Messenger }) {
-  // On an invite-only instance each opening mints a fresh single-use code for one person.
-  const [registration, setRegistration] = useState<string | null>(null);
-  const [link, setLink] = useState(inviteLink(location.origin, m.mailbox));
+  const link = inviteLink(location.origin, m.mailbox);
   const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    m.relay
-      .registration()
-      .then(async (mode) => {
-        if (mode === 'invite') setLink(inviteLink(location.origin, m.mailbox, await m.relay.mintInvite()));
-        setRegistration(mode);
-      })
-      .catch(() => setRegistration('open'));
-  }, [m]);
-  if (registration === null) return <p className="muted">{t('Preparando o convite…')}</p>;
   return (
     <div className="stack">
       <p className="muted">
         {t('Envie este link por um canal em que você confia. Ele leva o endereço desta instância e a impressão digital da sua chave: quem abrir consegue falar só com você.')}
       </p>
-      {registration === 'invite' && (
-        <p className="notice warn">{t('Esta instância só aceita convidados: este link serve para')}{' '}<strong>{t('uma pessoa')}</strong>{' '}{t('e vale 7 dias. Para convidar outra, feche e abra este convite de novo.')}</p>
-      )}
-      {registration === 'closed' && (
-        <p className="notice warn">{t('A instância não aceita pessoas novas no momento: o link só funciona para quem já participa dela.')}</p>
-      )}
       <code className="invite-link">{link}</code>
       <Qr text={link} />
       <p className="hint">

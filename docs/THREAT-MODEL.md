@@ -88,7 +88,7 @@ A Fase 0 (somente leitura, 2026-10-20) encontrou no sistema de origem problemas 
 - Tor: C Tor a partir de `deb.torproject.org` com verificação de assinatura, versão fixada. Arti reavaliado na Fase 2 (as notas da 2.5.1 ainda marcam partes dos circuitos onion como experimentais).
 - Chave do serviço onion: volume dedicado, permissão `0700`, dono = usuário do Tor. Perder a chave = perder o endereço (todos os convites quebram). Vazar a chave = outra pessoa pode se passar pela instância. Backup cifrado e fora da máquina.
 - Painel: só em `127.0.0.1`; recusa nomes de host que não sejam locais (DNS rebinding), exige cabeçalho próprio em toda alteração (CSRF) e cookie `SameSite=Strict`; senha com hash argon2id e limite de tentativas. O backup da chave sai cifrado do navegador (PBKDF2 + AES-GCM); a restauração confere que a chave privada gera o endereço antes de gravar (falha fechada). Qualquer processo local alcança a porta: a senha é a barreira.
-- Registro: modos aberto, só convidados e fechado. Os códigos são guardados como hash, sem autor nem usuário (sem grafo social no relay).
+- Registro: aberto a quem tem o endereço `.onion`, até o limite de caixas. O endereço funciona como o convite da instância.
 - Logs do relay: sem IP (atrás do Tor, de todo modo é `127.0.0.1`), sem identificadores de caixa por padrão, retenção mínima.
 
 ## 8. Em aberto

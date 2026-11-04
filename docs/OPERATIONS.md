@@ -24,7 +24,7 @@ A última linha mostra o endereço `.onion` da instância. Na primeira vez, publ
 | `tor` | `debian-tor` | `internal` + `egress` | somente leitura; grava apenas em `/var/lib/tor` e `/run/onion` |
 | `admin` | `100` (o mesmo do Tor) | `internal` + `admin` | somente leitura; grava apenas em `/admin` e no token interno |
 
-O aplicativo não publica porta no host. A única porta publicada é a do **painel** (`127.0.0.1:8099`, mude com `PRIVATUM_INFO_PORT`), presa ao endereço local. O painel nunca é alcançável pelo `.onion`: o serviço onion só encaminha para a porta 8080 do relay. Todos os contêineres rodam sem *capabilities* e com `no-new-privileges`.
+O aplicativo não publica porta no host. A única porta publicada é a do **painel** (`127.0.0.1:8099` e `[::1]:8099`, mude com `PRIVATUM_INFO_PORT`), presa ao endereço local. O painel nunca é alcançável pelo `.onion`: o serviço onion só encaminha para a porta 8080 do relay. Todos os contêineres rodam sem *capabilities* e com `no-new-privileges`.
 
 ## Painel
 
@@ -38,17 +38,11 @@ Como ele funciona sem virar uma brecha:
 
 Qualquer programa rodando neste computador consegue abrir `127.0.0.1:8099`; a senha é o que protege o painel. Em máquina compartilhada, use uma senha forte.
 
-## Quem pode entrar e contas
+## Quem entra e contas
 
-No painel, **Quem pode entrar** tem três modos. Quem já tem conta nunca é afetado por eles:
+Qualquer pessoa que tenha o endereço `.onion` pode criar uma identidade na instância (o limite é `PRIVATUM_MAX_MAILBOXES`). Para conversar, ela precisa do **Meu convite** de alguém, que leva o endereço da caixa dessa pessoa. O endereço é o que protege a instância: compartilhe só com quem você quer lá.
 
-- **Aberta** (padrão): qualquer pessoa com o endereço cria uma identidade.
-- **Só convidados**: é preciso um código. O **Meu convite** de quem já participa passa a levar um código de uso único, válido por 7 dias (cada vez que a pessoa abre o convite, sai um novo). O painel também cria convites (**Convites do painel**: de 1 a 100 usos, de 1 a 30 dias), úteis para você mesmo entrar primeiro. O link do painel aparece uma única vez; a instância guarda só o hash do código.
-- **Fechada**: ninguém novo entra.
-
-A instância não registra quem convidou quem.
-
-**Contas** lista as caixas pelo identificador (o mesmo que vai no convite de cada pessoa), a data de criação e quantas mensagens aguardam entrega. **Remover** apaga a caixa, as chaves públicas dela e as mensagens pendentes; os contatos deixam de conseguir escrever para ela. As conversas no navegador da pessoa continuam lá. Com a instância aberta, ela pode voltar sozinha; nos outros modos, precisa de um convite novo.
+**Contas** lista as caixas pelo identificador (o mesmo que vai no convite de cada pessoa), a data de criação e quantas mensagens aguardam entrega. **Remover** apaga a caixa, as chaves públicas dela e as mensagens pendentes; os contatos deixam de conseguir escrever para ela. As conversas no navegador da pessoa continuam lá, e a conta é recriada sozinha na próxima vez que ela desbloquear o Privatum. Como o painel não sabe de quem é cada caixa, a remoção pede que você confira antes que não é a sua (o identificador da sua caixa aparece no link do seu **Meu convite**, depois de `#c=`).
 
 ## Volumes
 

@@ -22,8 +22,6 @@ const ERRORS: Record<string, string> = {
   no_key_yet: t('O Tor ainda não criou a chave. Tente em alguns segundos.'),
   cannot_save: t('Não foi possível gravar a chave.'),
   cannot_delete: t('Não foi possível apagar a chave atual.'),
-  bad_invite_limits: t('Use de 1 a 100 usos e de 1 a 30 dias.'),
-  too_many_invites: t('Há convites demais ativos. Revogue alguns antes.'),
 };
 const describe = (code: string) => ERRORS[code] ?? t('Erro: {code}', { code });
 
@@ -485,24 +483,11 @@ function RotateForm({ onBackup, onDone }: { onBackup: () => void; onDone: () => 
 }
 
 interface AccessData {
-  registration: 'open' | 'invite' | 'closed';
-  invites: { id: string; by_admin: boolean; created_at: number; expires_at: number; uses_left: number }[];
   mailboxes: { id: string; created_at: number; pending: number }[];
 }
 
 const date = (unix: number) => new Date(unix * 1000).toLocaleDateString(lang() === 'en' ? 'en-US' : 'pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-const MODES: { value: AccessData['registration']; label: string; help: string }[] = [
-  { value: 'open', label: t('Aberta'), help: t('Qualquer pessoa que tenha o endereço pode criar uma identidade aqui.') },
-  {
-    value: 'invite',
-    label: t('Só convidados'),
-    help: t('Precisa de um código: o “Meu convite” de quem já participa leva um (uso único, 7 dias), ou um convite criado aqui.'),
-  },
-  { value: 'closed', label: t('Fechada'), help: t('Ninguém novo entra. Quem já participa continua normalmente.') },
-];
-
-/** Grid wraps cards, so this one spans the full width to fit its tables. */
 function Access() {
   const [data, setData] = useState<AccessData | null>(null);
   const [error, setError] = useState('');
@@ -517,131 +502,17 @@ function Access() {
     void load();
   }, []);
   if (!data) return error ? <p className="notice danger">{error}</p> : null;
-  const adminInvites = data.invites.filter((i) => i.by_admin);
-  const memberInvites = data.invites.length - adminInvites.length;
-  return (
-    <>
-      <Card title={t('Quem pode entrar')}>
-        <div className="modes" role="radiogroup" aria-label={t('Quem pode criar identidade nesta instância')}>
-          {MODES.map((mode) => (
-            <label key={mode.value} className={`mode ${data.registration === mode.value ? 'active' : ''}`}>
-              <input
-                type="radio"
-                name="registration"
-                value={mode.value}
-                checked={data.registration === mode.value}
-                onChange={() => api('/api/access/registration', { mode: mode.value }).then(load, (e) => setError(describe(e.message)))}
-              />
-              <span>
-                <strong>{mode.label}</strong>
-                <span className="hint">{mode.help}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-        {error && <p className="notice danger" role="alert">{error}</p>}
-      </Card>
-      <Invites adminInvites={adminInvites} memberInvites={memberInvites} registration={data.registration} onChange={load} />
-      <Accounts mailboxes={data.mailboxes} onChange={load} />
-    </>
-  );
-}
-
-function Invites({
-  adminInvites,
-  memberInvites,
-  registration,
-  onChange,
-}: {
-  adminInvites: AccessData['invites'];
-  memberInvites: number;
-  registration: AccessData['registration'];
-  onChange: () => void;
-}) {
-  const [uses, setUses] = useState(1);
-  const [days, setDays] = useState(7);
-  const [created, setCreated] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const { busy, error, run } = useAction();
-  return (
-    <Card title={t('Convites do painel')}>
-      {registration !== 'invite' && <p className="hint">{t('Os códigos só são exigidos no modo “Só convidados”.')}</p>}
-      <form
-        className="invite-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void run(async () => {
-            const r = await api<{ link: string }>('/api/access/invites', { uses, days });
-            setCreated(r.link);
-            setCopied(false);
-            onChange();
-          });
-        }}
-      >
-        <label className="field">
-          <span>{t('Usos')}</span>
-          <input type="number" min={1} max={100} value={uses} onChange={(e) => setUses(Number(e.target.value))} />
-        </label>
-        <label className="field">
-          <span>{t('Vale por (dias)')}</span>
-          <input type="number" min={1} max={30} value={days} onChange={(e) => setDays(Number(e.target.value))} />
-        </label>
-        <button className="btn primary" disabled={busy}>{t('Criar convite')}</button>
-      </form>
-      {error && <p className="notice danger" role="alert">{error}</p>}
-      {created && (
-        <div className="stack">
-          <p className="notice ok">{t('Copie agora: o link não é mostrado de novo (a instância guarda só uma impressão do código).')}</p>
-          <code className="onion">{created}</code>
-          <div className="row">
-            <button
-              className="btn quiet"
-              onClick={async () => {
-                await navigator.clipboard.writeText(created);
-                setCopied(true);
-              }}
-            >
-              <Icon name={copied ? 'check' : 'link'} /> {copied ? t('Copiado') : t('Copiar link')}
-            </button>
-          </div>
-          <Qr text={created} />
-          <p className="hint">{t('Quem abrir este link no Tor Browser cria a identidade já com o código. Ele não adiciona você como contato.')}</p>
-        </div>
-      )}
-      {adminInvites.length > 0 && (
-        <table className="table">
-          <thead>
-            <tr>
-              <th>{t('Código')}</th>
-              <th>{t('Usos restantes')}</th>
-              <th>{t('Expira')}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {adminInvites.map((i) => (
-              <tr key={i.id}>
-                <td className="mono">{i.id.slice(0, 8)}…</td>
-                <td>{i.uses_left}</td>
-                <td>{date(i.expires_at)}</td>
-                <td>
-                  <button className="btn quiet danger-text small" onClick={() => api('/api/access/invites/revoke', { id: i.id }).then(onChange)}>
-                    {t('Revogar')}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {memberInvites > 0 && <p className="hint">{t('Mais {n} convite(s) de membros ainda não usado(s).', { n: memberInvites })}</p>}
-    </Card>
-  );
+  return <Accounts mailboxes={data.mailboxes} onChange={load} />;
 }
 
 function Accounts({ mailboxes, onChange }: { mailboxes: AccessData['mailboxes']; onChange: () => void }) {
   const [removing, setRemoving] = useState<string | null>(null);
+  const [sure, setSure] = useState(false);
   const { busy, error, run } = useAction();
+  const close = () => {
+    setRemoving(null);
+    setSure(false);
+  };
   return (
     <Card title={t('Contas ({n})', { n: mailboxes.length })}>
       <p className="hint">
@@ -671,20 +542,30 @@ function Accounts({ mailboxes, onChange }: { mailboxes: AccessData['mailboxes'];
           </tbody>
         </table>
       )}
-      <Modal open={removing !== null} onClose={() => setRemoving(null)} title={t('Remover conta')}>
+      <Modal open={removing !== null} onClose={close} title={t('Remover conta')}>
         <div className="stack">
-          <p className="muted">
-            {t('Apaga desta instância a caixa')}{' '}<code className="mono">{removing?.slice(0, 10)}…</code>{t(', as chaves públicas dela e as mensagens que ainda esperavam entrega. Os contatos deixam de conseguir escrever para ela. As conversas guardadas no navegador da pessoa não são apagadas.')}
+          <p className="notice danger">
+            {t('Esta pode ser a sua própria conta. O painel não sabe de quem é cada caixa.')}
           </p>
-          <p className="hint">{t('Com a instância aberta, a pessoa pode voltar sozinha; nos outros modos, precisa de um convite novo.')}</p>
+          <code className="onion">{removing}</code>
+          <p className="muted">
+            {t('Para conferir se é a sua: no Privatum, abra “Meu convite”; o identificador da sua caixa é o texto depois de “#c=” no link. Compare com o de cima.')}
+          </p>
+          <p className="muted">
+            {t('Remover apaga desta instância as chaves públicas da caixa e as mensagens que esperavam entrega, que se perdem. Até a pessoa abrir o Privatum de novo, ninguém consegue escrever para ela; ao desbloquear, a conta é recriada sozinha. As conversas no navegador dela não são apagadas.')}
+          </p>
+          <label className="check">
+            <input type="checkbox" checked={sure} onChange={(e) => setSure(e.target.checked)} />
+            {t('Conferi: esta caixa não é a minha, e quero removê-la')}
+          </label>
           {error && <p className="notice danger" role="alert">{error}</p>}
           <button
             className="btn danger"
-            disabled={busy}
+            disabled={busy || !sure}
             onClick={() =>
               run(async () => {
                 await api('/api/access/mailboxes/remove', { id: removing });
-                setRemoving(null);
+                close();
                 onChange();
               })
             }

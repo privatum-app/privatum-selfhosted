@@ -17,7 +17,7 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
-use data_encoding::{BASE32_NOPAD, BASE64_NOPAD, HEXLOWER};
+use data_encoding::{BASE32_NOPAD, BASE64_NOPAD};
 use ed25519_dalek::{Signature, VerifyingKey};
 use rand::{rngs::OsRng, RngCore};
 use rusqlite::{params, Connection, OptionalExtension};
@@ -32,12 +32,6 @@ const MAX_ENVELOPE: usize = 64 * 1024;
 const MAX_PENDING_PER_MAILBOX: i64 = 1000;
 const MAX_ONE_TIME_KEYS: usize = 100;
 const MAX_NONCES: usize = 10_000;
-/// Codes members can mint for their own invite links: single use, one week.
-const MEMBER_INVITE_TTL: i64 = 7 * 86_400;
-const MAX_ACTIVE_INVITES: i64 = 1_000;
-
-/// Who may create a mailbox here. Existing mailboxes are never affected.
-const REGISTRATION_MODES: [&str; 3] = ["open", "invite", "closed"];
 
 const CSP: &str = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; \
 connect-src 'self'; img-src 'self' data: blob:; style-src 'self'; font-src 'self'; \
@@ -97,33 +91,6 @@ fn b64_fixed<const N: usize>(s: &str) -> Result<[u8; N], Response> {
         .ok_or_else(|| err(StatusCode::BAD_REQUEST, "bad_encoding"))
 }
 
-fn code_hash(code: &str) -> String {
-    HEXLOWER.encode(&Sha256::digest(code.trim().as_bytes()))
-}
-
-fn registration_mode(db: &Connection) -> String {
-    db.query_row("SELECT value FROM settings WHERE key = 'registration'", [], |r| r.get(0))
-        .unwrap_or_else(|_| "open".into())
-}
-
-/// Stores a new invite code (hash only) and returns the code itself.
-fn mint_invite(db: &Connection, by_admin: bool, uses: i64, ttl_secs: i64) -> Result<String, Response> {
-    let active: i64 = db.query_row("SELECT COUNT(*) FROM invite_codes", [], |r| r.get(0)).map_err(db_err)?;
-    if active >= MAX_ACTIVE_INVITES {
-        return Err(err(StatusCode::SERVICE_UNAVAILABLE, "too_many_invites"));
-    }
-    let mut raw = [0u8; 16];
-    OsRng.fill_bytes(&mut raw);
-    let code = BASE32_NOPAD.encode(&raw).to_ascii_lowercase();
-    let now = now_unix();
-    db.execute(
-        "INSERT INTO invite_codes (hash, by_admin, created_at, expires_at, uses_left) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![code_hash(&code), by_admin, now, now + ttl_secs, uses],
-    )
-    .map_err(db_err)?;
-    Ok(code)
-}
-
 fn verify(ed25519: &[u8; 32], msg: &[u8], signature: &str) -> Result<(), Response> {
     let key = VerifyingKey::from_bytes(ed25519).map_err(|_| err(StatusCode::BAD_REQUEST, "bad_key"))?;
     let sig = Signature::from_bytes(&b64_fixed::<64>(signature)?);
@@ -167,16 +134,9 @@ pub fn open_state(cfg: &Config) -> rusqlite::Result<Shared> {
              envelope TEXT NOT NULL,
              created_at INTEGER NOT NULL);
          CREATE INDEX IF NOT EXISTS messages_to ON messages (to_mailbox, id);
-         CREATE TABLE IF NOT EXISTS settings (
-             key TEXT PRIMARY KEY,
-             value TEXT NOT NULL);
-         -- Only a hash of each code, and never who minted or used it (no social graph).
-         CREATE TABLE IF NOT EXISTS invite_codes (
-             hash TEXT PRIMARY KEY,
-             by_admin INTEGER NOT NULL,
-             created_at INTEGER NOT NULL,
-             expires_at INTEGER NOT NULL,
-             uses_left INTEGER NOT NULL);",
+         -- Left by the removed invite-only registration (0.2 development builds).
+         DROP TABLE IF EXISTS invite_codes;
+         DROP TABLE IF EXISTS settings;",
     )?;
     Ok(Arc::new(AppState {
         db: Mutex::new(db),
@@ -257,7 +217,6 @@ impl AppState {
         let cutoff = now_unix() - self.message_ttl_secs;
         let db = lock(&self.db);
         let _ = db.execute("DELETE FROM messages WHERE created_at < ?1", [cutoff]);
-        let _ = db.execute("DELETE FROM invite_codes WHERE expires_at < ?1 OR uses_left <= 0", [now_unix()]);
         drop(db);
         let now = Instant::now();
         lock(&self.nonces).retain(|_, (_, exp)| *exp > now);
@@ -275,9 +234,7 @@ pub fn app(state: Shared, static_dir: Option<&str>) -> Router {
         .route("/v1/keys/{mailbox_id}", get(get_keys))
         .route("/v1/messages", post(post_message))
         .route("/v1/messages/{id}", delete(delete_message))
-        .route("/v1/inbox", get(inbox))
-        .route("/v1/instance", get(instance))
-        .route("/v1/invites", post(member_invite));
+        .route("/v1/inbox", get(inbox));
     if let Some(dir) = static_dir {
         // Vite fingerprints everything under /assets, so it can be cached for good; gzip
         // copies made at build time cut the WASM/JS download over Tor about threefold.
@@ -319,9 +276,6 @@ pub fn admin_app(state: Shared, token_file: String) -> Router {
     Router::new()
         .route("/admin/stats", get(admin_stats))
         .route("/admin/access", get(admin_access))
-        .route("/admin/registration", post(admin_set_registration))
-        .route("/admin/invites", post(admin_new_invite))
-        .route("/admin/invites/revoke", post(admin_revoke_invite))
         .route("/admin/mailboxes/remove", post(admin_remove_mailbox))
         .layer(axum::middleware::from_fn(move |req: axum::extract::Request, next: axum::middleware::Next| {
             let token_file = token_file.clone();
@@ -357,32 +311,14 @@ async fn admin_stats(State(s): State<Shared>) -> Result<Response, Response> {
         "message_bytes": count("SELECT COALESCE(SUM(LENGTH(envelope)), 0) FROM messages")?,
         "db_bytes": count("SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()")?,
         "max_mailboxes": s.max_mailboxes,
-        "registration": registration_mode(&db),
         "message_ttl_days": s.message_ttl_secs / 86_400,
     }))
     .into_response())
 }
 
-/// Registration mode, live invite codes (by hash prefix) and mailboxes with their queue size.
+/// Mailboxes with their creation time and queue size: no names, no contacts.
 async fn admin_access(State(s): State<Shared>) -> Result<Response, Response> {
     let db = lock(&s.db);
-    let now = now_unix();
-    let mut stmt = db
-        .prepare(
-            "SELECT substr(hash, 1, 16), by_admin, created_at, expires_at, uses_left FROM invite_codes
-             WHERE expires_at > ?1 AND uses_left > 0 ORDER BY created_at DESC LIMIT 200",
-        )
-        .map_err(db_err)?;
-    let invites: Vec<serde_json::Value> = stmt
-        .query_map([now], |r| {
-            Ok(serde_json::json!({
-                "id": r.get::<_, String>(0)?, "by_admin": r.get::<_, bool>(1)?,
-                "created_at": r.get::<_, i64>(2)?, "expires_at": r.get::<_, i64>(3)?, "uses_left": r.get::<_, i64>(4)?,
-            }))
-        })
-        .map_err(db_err)?
-        .collect::<Result<_, _>>()
-        .map_err(db_err)?;
     let mut stmt = db
         .prepare(
             "SELECT m.id, m.created_at, (SELECT COUNT(*) FROM messages WHERE to_mailbox = m.id)
@@ -398,36 +334,7 @@ async fn admin_access(State(s): State<Shared>) -> Result<Response, Response> {
         .map_err(db_err)?
         .collect::<Result<_, _>>()
         .map_err(db_err)?;
-    Ok(Json(serde_json::json!({ "registration": registration_mode(&db), "invites": invites, "mailboxes": mailboxes })).into_response())
-}
-
-#[derive(Deserialize)]
-struct RegistrationReq {
-    mode: String,
-}
-
-async fn admin_set_registration(State(s): State<Shared>, Json(req): Json<RegistrationReq>) -> Result<Response, Response> {
-    if !REGISTRATION_MODES.contains(&req.mode.as_str()) {
-        return Err(err(StatusCode::BAD_REQUEST, "bad_mode"));
-    }
-    lock(&s.db)
-        .execute("INSERT INTO settings (key, value) VALUES ('registration', ?1) ON CONFLICT(key) DO UPDATE SET value = ?1", [&req.mode])
-        .map_err(db_err)?;
-    Ok(Json(serde_json::json!({ "registration": req.mode })).into_response())
-}
-
-#[derive(Deserialize)]
-struct NewInviteReq {
-    uses: i64,
-    days: i64,
-}
-
-async fn admin_new_invite(State(s): State<Shared>, Json(req): Json<NewInviteReq>) -> Result<Response, Response> {
-    if !(1..=100).contains(&req.uses) || !(1..=30).contains(&req.days) {
-        return Err(err(StatusCode::BAD_REQUEST, "bad_invite_limits"));
-    }
-    let code = mint_invite(&lock(&s.db), true, req.uses, req.days * 86_400)?;
-    Ok(Json(serde_json::json!({ "code": code })).into_response())
+    Ok(Json(serde_json::json!({ "mailboxes": mailboxes })).into_response())
 }
 
 #[derive(Deserialize)]
@@ -435,18 +342,8 @@ struct IdReq {
     id: String,
 }
 
-async fn admin_revoke_invite(State(s): State<Shared>, Json(req): Json<IdReq>) -> Result<Response, Response> {
-    if req.id.len() != 16 || !req.id.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err(err(StatusCode::BAD_REQUEST, "bad_id"));
-    }
-    lock(&s.db)
-        .execute("DELETE FROM invite_codes WHERE substr(hash, 1, 16) = ?1", [&req.id])
-        .map_err(db_err)?;
-    Ok(Json(serde_json::json!({ "ok": true })).into_response())
-}
-
-/// Deletes a mailbox with its keys and pending messages. In "open" mode its owner can
-/// register again; otherwise they need a new invite.
+/// Deletes a mailbox with its keys and pending messages. Its owner's app registers it
+/// again the next time it is unlocked.
 async fn admin_remove_mailbox(State(s): State<Shared>, Json(req): Json<IdReq>) -> Result<Response, Response> {
     lock(&s.db).execute("DELETE FROM mailboxes WHERE id = ?1", [&req.id]).map_err(db_err)?;
     lock(&s.tokens).retain(|_, (mailbox, _)| *mailbox != req.id);
@@ -458,9 +355,6 @@ struct RegisterReq {
     ed25519: String,
     curve25519: String,
     signature: String,
-    /// Required for new mailboxes when registration is "invite".
-    #[serde(default)]
-    invite: Option<String>,
 }
 
 async fn register(State(s): State<Shared>, Json(req): Json<RegisterReq>) -> Result<Response, Response> {
@@ -482,25 +376,6 @@ async fn register(State(s): State<Shared>, Json(req): Json<RegisterReq>) -> Resu
         if count >= s.max_mailboxes {
             return Err(err(StatusCode::SERVICE_UNAVAILABLE, "instance_full"));
         }
-        match registration_mode(&db).as_str() {
-            "open" => {}
-            "invite" => {
-                let code = req.invite.as_deref().ok_or_else(|| err(StatusCode::FORBIDDEN, "invite_required"))?;
-                let used = db
-                    .execute(
-                        "UPDATE invite_codes SET uses_left = uses_left - 1
-                         WHERE hash = ?1 AND uses_left > 0 AND expires_at > ?2",
-                        params![code_hash(code), now_unix()],
-                    )
-                    .map_err(db_err)?;
-                if used == 0 {
-                    return Err(err(StatusCode::FORBIDDEN, "invalid_invite"));
-                }
-                db.execute("DELETE FROM invite_codes WHERE uses_left <= 0", []).map_err(db_err)?;
-            }
-            // Unknown values fail closed.
-            _ => return Err(err(StatusCode::FORBIDDEN, "registration_closed")),
-        }
         db.execute(
             "INSERT INTO mailboxes (id, ed25519, curve25519, created_at) VALUES (?1, ?2, ?3, ?4)",
             params![id, req.ed25519, req.curve25519, now_unix()],
@@ -508,23 +383,6 @@ async fn register(State(s): State<Shared>, Json(req): Json<RegisterReq>) -> Resu
         .map_err(db_err)?;
     }
     Ok(Json(serde_json::json!({ "mailbox_id": id })).into_response())
-}
-
-/// Public: lets the client tell people whether they need an invite before they try.
-async fn instance(State(s): State<Shared>) -> Response {
-    Json(serde_json::json!({ "registration": registration_mode(&lock(&s.db)) })).into_response()
-}
-
-/// A member mints a single-use code to put in their own invite link.
-async fn member_invite(State(s): State<Shared>, headers: HeaderMap) -> Result<Response, Response> {
-    let mailbox = s.authed(&headers)?;
-    s.rate(&format!("invite:{mailbox}"), 10.0)?;
-    let db = lock(&s.db);
-    if registration_mode(&db) != "invite" {
-        return Err(err(StatusCode::CONFLICT, "not_invite_mode"));
-    }
-    let code = mint_invite(&db, false, 1, MEMBER_INVITE_TTL)?;
-    Ok(Json(serde_json::json!({ "code": code, "expires_in": MEMBER_INVITE_TTL })).into_response())
 }
 
 #[derive(Deserialize)]

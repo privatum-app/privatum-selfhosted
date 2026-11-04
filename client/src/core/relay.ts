@@ -60,21 +60,10 @@ export class Relay {
     return json;
   }
 
-  /** `invite` is needed only for a new mailbox on an invite-only instance. */
-  async register(ed25519: string, curve25519: string, invite?: string): Promise<string> {
+  async register(ed25519: string, curve25519: string): Promise<string> {
     const signature = this.opts.sign(concat(utf8('privatum-register-v1'), fromB64(ed25519), fromB64(curve25519)));
-    const r = (await this.raw('POST', '/v1/register', { ed25519, curve25519, signature, invite })) as { mailbox_id: string };
+    const r = (await this.raw('POST', '/v1/register', { ed25519, curve25519, signature })) as { mailbox_id: string };
     return r.mailbox_id;
-  }
-
-  /** Who may join this instance: "open", "invite" or "closed". */
-  async registration(): Promise<string> {
-    return ((await this.raw('GET', '/v1/instance')) as { registration: string }).registration;
-  }
-
-  /** Single-use code (one week) to put in our invite link on an invite-only instance. */
-  async mintInvite(): Promise<string> {
-    return ((await this.call('POST', '/v1/invites', {})) as { code: string }).code;
   }
 
   async auth(): Promise<string> {

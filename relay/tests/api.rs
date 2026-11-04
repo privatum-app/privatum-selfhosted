@@ -59,16 +59,11 @@ impl User {
     }
 
     async fn register(&self, r: &Router) -> (StatusCode, Value) {
-        self.register_with(r, None).await
-    }
-
-    async fn register_with(&self, r: &Router, invite: Option<&str>) -> (StatusCode, Value) {
         let ed = self.sk.verifying_key().to_bytes();
         let body = json!({
             "ed25519": b64(&ed),
             "curve25519": b64(&self.curve),
             "signature": self.sign(&[b"privatum-register-v1", &ed, &self.curve]),
-            "invite": invite,
         });
         call(r, "POST", "/v1/register", None, body).await
     }
@@ -364,56 +359,6 @@ fn app_and_admin() -> (Router, Router, std::path::PathBuf) {
 }
 
 #[tokio::test]
-async fn invite_mode_needs_a_valid_unused_code_but_never_locks_out_members() {
-    let (r, admin, dir) = app_and_admin();
-    let member = User::new();
-    assert_eq!(member.register(&r).await.0, StatusCode::OK, "open by default");
-    assert_eq!(call(&r, "GET", "/v1/instance", None, json!({})).await.1["registration"], "open");
-    let token = member.login(&r).await;
-    assert_eq!(call(&r, "POST", "/v1/invites", Some(&token), json!({})).await.1["error"], "not_invite_mode");
-
-    assert_eq!(call(&admin, "POST", "/admin/registration", Some("t"), json!({ "mode": "nope" })).await.0, StatusCode::BAD_REQUEST);
-    assert_eq!(call(&admin, "POST", "/admin/registration", Some("t"), json!({ "mode": "invite" })).await.0, StatusCode::OK);
-    assert_eq!(call(&r, "GET", "/v1/instance", None, json!({})).await.1["registration"], "invite");
-
-    let newcomer = User::new();
-    assert_eq!(newcomer.register(&r).await.1["error"], "invite_required");
-    assert_eq!(newcomer.register_with(&r, Some("aaaaaaaaaaaaaaaaaaaaaaaaaa")).await.1["error"], "invalid_invite");
-    assert_eq!(member.register(&r).await.0, StatusCode::OK, "existing mailboxes need no code");
-
-    // A member's code works once.
-    assert_eq!(call(&r, "POST", "/v1/invites", None, json!({})).await.0, StatusCode::UNAUTHORIZED);
-    let (status, v) = call(&r, "POST", "/v1/invites", Some(&token), json!({})).await;
-    assert_eq!(status, StatusCode::OK);
-    let code = v["code"].as_str().unwrap().to_owned();
-    assert_eq!(code.len(), 26);
-    assert_eq!(newcomer.register_with(&r, Some(&code)).await.0, StatusCode::OK);
-    assert_eq!(User::new().register_with(&r, Some(&code)).await.1["error"], "invalid_invite");
-
-    // An admin code with two uses; revoking it stops the rest.
-    let (_, v) = call(&admin, "POST", "/admin/invites", Some("t"), json!({ "uses": 2, "days": 1 })).await;
-    let admin_code = v["code"].as_str().unwrap().to_owned();
-    assert_eq!(User::new().register_with(&r, Some(&admin_code)).await.0, StatusCode::OK);
-    let (_, access) = call(&admin, "GET", "/admin/access", Some("t"), json!({})).await;
-    let live = access["invites"].as_array().unwrap();
-    assert_eq!(live.len(), 1, "used-up member code is gone");
-    assert_eq!(live[0]["uses_left"], 1);
-    assert_eq!(live[0]["by_admin"], true);
-    assert!(!access.to_string().contains(&admin_code), "the panel never sees codes again, only hash prefixes");
-    let id = live[0]["id"].as_str().unwrap();
-    assert_eq!(call(&admin, "POST", "/admin/invites/revoke", Some("t"), json!({ "id": id })).await.0, StatusCode::OK);
-    assert_eq!(User::new().register_with(&r, Some(&admin_code)).await.1["error"], "invalid_invite");
-    assert_eq!(call(&admin, "POST", "/admin/invites", Some("t"), json!({ "uses": 0, "days": 1 })).await.0, StatusCode::BAD_REQUEST);
-
-    // Closed: nobody new, members still fine.
-    call(&admin, "POST", "/admin/registration", Some("t"), json!({ "mode": "closed" })).await;
-    let (_, v) = call(&admin, "POST", "/admin/invites", Some("t"), json!({ "uses": 1, "days": 1 })).await;
-    assert_eq!(User::new().register_with(&r, v["code"].as_str()).await.1["error"], "registration_closed");
-    assert_eq!(member.register(&r).await.0, StatusCode::OK);
-    std::fs::remove_dir_all(dir).ok();
-}
-
-#[tokio::test]
 async fn removing_a_mailbox_drops_its_keys_queue_and_sessions() {
     let (r, admin, dir) = app_and_admin();
     let (alice, bob) = (User::new(), User::new());
@@ -430,5 +375,6 @@ async fn removing_a_mailbox_drops_its_keys_queue_and_sessions() {
     assert_eq!(call(&r, "GET", &format!("/v1/keys/{}", bob.id), Some(&ta), json!({})).await.0, StatusCode::NOT_FOUND);
     let (_, stats) = call(&admin, "GET", "/admin/stats", Some("t"), json!({})).await;
     assert_eq!((stats["mailboxes"].clone(), stats["messages"].clone()), (json!(1), json!(0)));
+    assert_eq!(bob.register(&r).await.0, StatusCode::OK, "its owner can come back");
     std::fs::remove_dir_all(dir).ok();
 }

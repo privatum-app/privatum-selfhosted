@@ -237,8 +237,7 @@ export class Messenger {
     return (await storage.get('state')) !== undefined;
   }
 
-  /** `invite` is the registration code from the link, when the instance requires one. */
-  static async create(passphrase: string, deps: Deps, invite?: string): Promise<Messenger> {
+  static async create(passphrase: string, deps: Deps): Promise<Messenger> {
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const keys = await deriveKeys(passphrase, salt);
     const account = new deps.olm.Account();
@@ -246,8 +245,8 @@ export class Messenger {
     const mailbox = await mailboxId(account.ed25519, account.curve25519);
     const state: Saved = { v: 1, account: '', mailbox, contacts: {}, sessions: {} };
     const m = new Messenger(deps, keys, account, state);
-    // Register before saving: a refused registration (no or used-up invite) leaves nothing behind.
-    await m.relay.register(account.ed25519, account.curve25519, invite);
+    // Register before saving: a refused registration (instance full) leaves nothing behind.
+    await m.relay.register(account.ed25519, account.curve25519);
     await deps.storage.set('salt', btoa(String.fromCharCode(...salt)));
     await m.save();
     await m.connect(true);
@@ -270,7 +269,7 @@ export class Messenger {
    * Restores an identity from an exported backup. Throws `bad_backup` for a
    * malformed file and `wrong_passphrase` for a wrong passphrase.
    */
-  static async importBackup(text: string, passphrase: string, deps: Deps, invite?: string): Promise<Messenger> {
+  static async importBackup(text: string, passphrase: string, deps: Deps): Promise<Messenger> {
     let file: { format?: unknown; v?: unknown; salt?: unknown; state?: unknown };
     try {
       file = JSON.parse(text);
@@ -288,8 +287,8 @@ export class Messenger {
     state.unsaved = 0;
     const account = deps.olm.Account.fromPickle(state.account, keys.pickleKey);
     const m = new Messenger(deps, keys, account, state);
-    // A mailbox the admin removed needs an invite again; refuse before replacing local data.
-    await m.relay.register(account.ed25519, account.curve25519, invite);
+    // Refuse before replacing local data if the instance won't take the mailbox.
+    await m.relay.register(account.ed25519, account.curve25519);
     await deps.storage.set('salt', file.salt);
     await m.save();
     await m.connect(true);

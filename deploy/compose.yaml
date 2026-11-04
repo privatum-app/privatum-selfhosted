@@ -71,8 +71,10 @@ services:
       - admin-data:/admin
       - admin-token:/run/admin-token
     ports:
-      # Bound to 127.0.0.1 only: never reachable from the network.
+      # Loopback only (IPv4 and IPv6): never reachable from the network. Safari opens
+      # "localhost" over IPv6 first, so the Docker Desktop link needs both.
       - "127.0.0.1:${PRIVATUM_INFO_PORT:-8099}:8080"
+      - "[::1]:${PRIVATUM_INFO_PORT:-8099}:8080"
     networks:
       - internal
       - admin
