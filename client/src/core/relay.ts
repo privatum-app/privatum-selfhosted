@@ -36,11 +36,14 @@ export interface RelayOptions {
   mailbox: string;
   sign: (message: Uint8Array) => string;
   fetch?: typeof fetch;
+  /** Our public keys and what to do once the mailbox had to be registered again. */
+  recreate?: { ed25519: string; curve25519: string; done: () => Promise<void> };
 }
 
 export class Relay {
   opts: RelayOptions;
   token: string | null = null;
+  private recreating = false;
 
   constructor(opts: RelayOptions) {
     this.opts = opts;
@@ -67,6 +70,25 @@ export class Relay {
   }
 
   async auth(): Promise<string> {
+    try {
+      return await this.login();
+    } catch (e) {
+      // Refused although our signature is good: the instance owner removed our mailbox. Register it again, once.
+      const r = this.opts.recreate;
+      if (!(e instanceof RelayError) || e.status !== 401 || !r || this.recreating) throw e;
+      this.recreating = true;
+      try {
+        await this.register(r.ed25519, r.curve25519);
+        const token = await this.login();
+        await r.done();
+        return token;
+      } finally {
+        this.recreating = false;
+      }
+    }
+  }
+
+  private async login(): Promise<string> {
     const { nonce } = (await this.raw('POST', '/v1/auth/challenge', { mailbox_id: this.opts.mailbox })) as { nonce: string };
     const signature = this.opts.sign(concat(utf8('privatum-auth-v1'), utf8(this.opts.host), fromB64(nonce)));
     const r = (await this.raw('POST', '/v1/auth/verify', { mailbox_id: this.opts.mailbox, nonce, signature })) as { token: string };

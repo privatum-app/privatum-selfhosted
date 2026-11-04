@@ -479,6 +479,12 @@ function Chat({
             <span>{t('Exporte antes de fechar o Tor Browser.')}</span>
           </button>
         )}
+        {m.recreated && (
+          <button className="backup-alert" onClick={() => { m.recreated = false; rerender(); }} title={t('Fechar aviso')}>
+            <strong>{t('O dono da instância removeu sua conta')}</strong>
+            <span>{t('Ela foi recriada e você continua com a mesma identidade e os mesmos contatos. Mensagens que esperavam entrega se perderam. Toque para fechar.')}</span>
+          </button>
+        )}
 
         <div className="new-row">
           <button className="btn primary new-chat" onClick={() => setDialog('add')}>

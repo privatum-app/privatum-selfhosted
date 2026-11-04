@@ -432,3 +432,33 @@ test('the owner deleting a group ends it for everyone; nobody else can end it', 
     for (const m of [alice, bob, carol]) m.close();
   }
 });
+
+// Needs the relay's admin API too, e.g. PRIVATUM_TEST_ADMIN=http://127.0.0.1:18081 PRIVATUM_TEST_ADMIN_TOKEN=...
+const adminBase = process.env.PRIVATUM_TEST_ADMIN;
+test('a mailbox removed by the instance owner while open is recreated and keeps working', { skip: base && adminBase ? false : 'set PRIVATUM_TEST_ADMIN' }, async () => {
+  const alice = await Messenger.create('alice passphrase rm1', deps());
+  const bob = await Messenger.create('bob passphrase rm1', deps());
+  try {
+    await alice.addContact(bob.mailbox, 'Bob');
+    await alice.send(bob.mailbox, 'antes');
+    await waitFor(() => bob.contact(alice.mailbox)?.messages.length === 1);
+
+    const r = await fetch(adminBase + '/admin/mailboxes/remove', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${process.env.PRIVATUM_TEST_ADMIN_TOKEN}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ id: alice.mailbox }),
+    });
+    assert.equal(r.status, 200);
+
+    // The relay closes alice's inbox; reconnecting registers her again without any action from her.
+    await waitFor(() => alice.recreated, 10_000);
+    await bob.send(alice.mailbox, 'depois');
+    await waitFor(() => alice.contact(bob.mailbox)!.messages.some((m) => m.text === 'depois'), 10_000);
+    await alice.send(bob.mailbox, 'ainda aqui');
+    await waitFor(() => bob.contact(alice.mailbox)!.messages.some((m) => m.text === 'ainda aqui'));
+    assert.equal(bob.contacts.filter((c) => c.mailbox === alice.mailbox).length, 1, 'same identity, no new contact');
+  } finally {
+    alice.close();
+    bob.close();
+  }
+});

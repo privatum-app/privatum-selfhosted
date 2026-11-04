@@ -229,6 +229,15 @@ export class Messenger {
       mailbox: state.mailbox,
       sign: (m) => account.sign(m),
       fetch: deps.fetch,
+      recreate: {
+        ed25519: account.ed25519,
+        curve25519: account.curve25519,
+        done: async () => {
+          this.recreated = true;
+          await this.publishKeys(); // the removal also deleted our one-time keys
+          this.changed();
+        },
+      },
     });
     for (const [mailbox, pickles] of Object.entries(state.sessions)) {
       this.sessions.set(mailbox, pickles.map((p) => deps.olm.Session.fromPickle(p, keys.pickleKey)));
@@ -305,6 +314,9 @@ export class Messenger {
     const [salt, state] = [await this.deps.storage.get('salt'), await this.deps.storage.get('state')];
     return JSON.stringify({ format: BACKUP_FORMAT, v: 1, salt, state });
   }
+
+  /** The instance owner removed our mailbox and it was registered again (shown once, not saved). */
+  recreated = false;
 
   get unsaved(): number {
     return this.state.unsaved ?? 0;
@@ -395,16 +407,24 @@ export class Messenger {
 
   private async openInbox() {
     if (this.stopped) return;
-    this.socket = await this.relay.openInbox(
+    const ws = await this.relay.openInbox(
       (d) => {
         this.inbox = this.inbox.then(() => this.receive(d)).catch(() => {});
       },
       () => {
         this.socket = null;
         // Tokens expire after 15 min and the relay closes the socket: reconnect.
-        if (!this.stopped) setTimeout(() => this.openInbox().catch(() => {}), 2000);
+        if (!this.stopped) setTimeout(() => this.openInbox().catch(() => this.retryInbox()), 2000);
       },
     );
+    // Closed while we were connecting: don't leave this socket open.
+    if (this.stopped) ws.close();
+    else this.socket = ws;
+  }
+
+  /** The inbox could not reopen (offline, Tor hiccup): keep trying instead of going silently deaf. */
+  private retryInbox() {
+    if (!this.stopped) setTimeout(() => this.openInbox().catch(() => this.retryInbox()), 10_000);
   }
 
   close() {

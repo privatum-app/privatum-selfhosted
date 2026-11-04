@@ -343,10 +343,12 @@ struct IdReq {
 }
 
 /// Deletes a mailbox with its keys and pending messages. Its owner's app registers it
-/// again the next time it is unlocked.
+/// again as soon as it reconnects (at once if open: its inbox is closed).
 async fn admin_remove_mailbox(State(s): State<Shared>, Json(req): Json<IdReq>) -> Result<Response, Response> {
     lock(&s.db).execute("DELETE FROM mailboxes WHERE id = ?1", [&req.id]).map_err(db_err)?;
     lock(&s.tokens).retain(|_, (mailbox, _)| *mailbox != req.id);
+    // Wakes its open inbox, which then sees the token is gone and closes.
+    let _ = s.notify.send(req.id);
     Ok(Json(serde_json::json!({ "ok": true })).into_response())
 }
 
@@ -591,7 +593,7 @@ async fn inbox_loop(s: Shared, mut sock: WebSocket) {
         Ok(Some(Ok(Message::Text(t)))) => serde_json::from_str::<WsAuth>(&t).ok(),
         _ => None,
     };
-    let Some((mailbox, expires)) = auth.and_then(|a| s.lookup_token(&a.token)) else {
+    let Some((token, (mailbox, expires))) = auth.and_then(|a| s.lookup_token(&a.token).map(|t| (a.token, t))) else {
         let _ = sock.send(Message::Close(None)).await;
         return;
     };
@@ -610,7 +612,8 @@ async fn inbox_loop(s: Shared, mut sock: WebSocket) {
                 Ok(to) if to != mailbox => {}
                 Err(broadcast::error::RecvError::Closed) => break,
                 // Our mailbox, or lagged (may have missed ours): re-read from the DB.
-                _ => if !send_pending(&s, &mut sock, &mailbox, &mut last_id).await { break },
+                // A revoked token (the mailbox was removed) closes the socket so the app notices.
+                _ => if s.lookup_token(&token).is_none() || !send_pending(&s, &mut sock, &mailbox, &mut last_id).await { break },
             },
             frame = sock.recv() => match frame {
                 Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,

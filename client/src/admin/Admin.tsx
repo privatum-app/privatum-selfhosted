@@ -556,7 +556,7 @@ function Accounts({ mailboxes, onChange }: { mailboxes: AccessData['mailboxes'];
             {t('Para conferir se é a sua: no Privatum, abra “Meu convite”; o identificador da sua caixa é o texto depois de “#c=” no link. Compare com o de cima.')}
           </p>
           <p className="muted">
-            {t('Remover apaga desta instância as chaves públicas da caixa e as mensagens que esperavam entrega, que se perdem. Não impede a pessoa de voltar: ao desbloquear o Privatum, a conta é recriada sozinha. Serve para limpar contas abandonadas ou de teste. Para manter alguém fora, troque o endereço da instância. As conversas no navegador dela não são apagadas.')}
+            {t('Remover apaga desta instância as chaves públicas da caixa e as mensagens que esperavam entrega, que se perdem. Não impede a pessoa de voltar: assim que o Privatum dela se conecta, a conta é recriada sozinha e ela vê um aviso. Serve para limpar contas abandonadas ou de teste. Para manter alguém fora, troque o endereço da instância. As conversas no navegador dela não são apagadas.')}
           </p>
           <label className="check">
             <input type="checkbox" checked={sure} onChange={(e) => setSure(e.target.checked)} />
