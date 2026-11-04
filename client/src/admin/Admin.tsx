@@ -179,15 +179,20 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   return (
     <div className="admin">
       <header className="admin-head">
-        <div className="brandmark">
-          <Logo size={30} />
-          <strong>{t('Privatum')}</strong>
-          <span className="muted">{t('Painel')}</span>
+        <span />
+        <div className="brandmark admin-brand">
+          <Logo size={44} />
+          <span>
+            <strong>Privatum</strong>
+            <span className="muted">{t('Painel')}</span>
+          </span>
         </div>
-        <LangSwitch />
-        <button className="icon-btn" title={t('Sair do painel')} aria-label={t('Sair do painel')} onClick={logout}>
-          <Icon name="logout" />
-        </button>
+        <div className="admin-actions">
+          <LangSwitch />
+          <button className="icon-btn" title={t('Sair do painel')} aria-label={t('Sair do painel')} onClick={logout}>
+            <Icon name="logout" />
+          </button>
+        </div>
       </header>
       {error && !restarting && <p className="notice danger" role="alert">{error}</p>}
       {restarting && (
@@ -204,16 +209,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         <p className="muted">{t('Carregando…')}</p>
       ) : (
         <div className="admin-grid">
+          {/* Two equal columns, each row's cards the same height; accounts span both. */}
           <Address onion={status.onion} />
-          {/* Status and the key mark share a column, filling the space beside the taller address card. */}
-          <div className="admin-col">
-            <Health status={status} />
-            <section className="panel card brand-card" aria-hidden="true">
-              <Logo size={150} />
-            </section>
-          </div>
-          <Usage relay={status.relay} />
           <OnionKey onion={status.onion} onRestart={(to) => setRestart({ from: status.onion, to })} />
+          <Health status={status} />
+          <Usage relay={status.relay} />
           {status.relay.ok && <Access />}
         </div>
       )}
@@ -221,9 +221,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   );
 }
 
-function Card({ title, children }: { title: string; children: ReactNode }) {
+function Card({ title, children, wide }: { title: string; children: ReactNode; wide?: boolean }) {
   return (
-    <section className="panel card">
+    <section className={wide ? 'panel card wide' : 'panel card'}>
       <h2>{title}</h2>
       {children}
     </section>
@@ -242,20 +242,24 @@ function Address({ onion }: { onion: string | null }) {
   const url = `http://${onion}`;
   return (
     <Card title={t('Endereço da instância')}>
-      <code className="onion">{url}</code>
-      <div className="row">
-        <button
-          className="btn primary"
-          onClick={async () => {
-            await navigator.clipboard.writeText(url);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-          }}
-        >
-          <Icon name={copied ? 'check' : 'link'} /> {copied ? t('Copiado') : t('Copiar endereço')}
-        </button>
+      <div className="address">
+        <Qr text={url} />
+        <div className="stack">
+          <code className="onion">{url}</code>
+          <div className="row">
+            <button
+              className="btn primary"
+              onClick={async () => {
+                await navigator.clipboard.writeText(url);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+            >
+              <Icon name={copied ? 'check' : 'link'} /> {copied ? t('Copiado') : t('Copiar endereço')}
+            </button>
+          </div>
+        </div>
       </div>
-      <Qr text={url} />
       <p className="hint">
         {t('Abra no Tor Browser (nível Standard) e crie sua identidade. Para convidar alguém, use “Meu convite” dentro do app, não este endereço sozinho.')}
       </p>
@@ -514,7 +518,7 @@ function Accounts({ mailboxes, onChange }: { mailboxes: AccessData['mailboxes'];
     setSure(false);
   };
   return (
-    <Card title={t('Contas ({n})', { n: mailboxes.length })}>
+    <Card title={t('Contas ({n})', { n: mailboxes.length })} wide>
       <p className="hint">
         {t('Cada conta aparece só pelo identificador da caixa (o mesmo que vai no convite da pessoa). O painel não sabe nomes nem quem conversa com quem.')}
       </p>

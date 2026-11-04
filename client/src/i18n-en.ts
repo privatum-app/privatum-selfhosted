@@ -209,7 +209,6 @@ export const EN: Record<string, string> = {
   'Conferindo…': 'Checking…',
   'Criar senha e entrar': 'Create password and sign in',
   'Entrar': 'Sign in',
-  'Privatum': 'Privatum',
   'Sair do painel': 'Sign out of the panel',
   'Reiniciando o Tor com a chave restaurada… Leva de alguns segundos a um minuto.': 'Restarting Tor with the restored key… It takes a few seconds to a minute.',
   'Reiniciando o Tor com a chave nova… Leva de alguns segundos a um minuto.': 'Restarting Tor with the new key… It takes a few seconds to a minute.',
