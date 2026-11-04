@@ -676,7 +676,7 @@ function GroupRow({ m, g, active, unread, onOpen }: { m: Messenger; g: Group; ac
           {unread > 0 && <span className="unread" aria-label={t('{n} novas', { n: unread })}>{unread}</span>}
         </span>
         <span className="contact-preview">
-          {g.left && <span className="tag warn">{t('fora do grupo')}</span>}
+          {g.left && <span className="tag warn">{g.ended ? t('encerrado') : t('fora do grupo')}</span>}
           <span className="preview-text">{preview(last, who ?? '', t('{n} pessoas', { n: g.members.length }))}</span>
         </span>
       </span>
@@ -1093,16 +1093,26 @@ function GroupConversation({
               <button
                 onClick={(e) => {
                   closeMenu(e);
-                  onConfirm({
-                    title: t('Sair de {name}?', { name: g.name }),
-                    body: t('Os membros são avisados e você para de receber as mensagens do grupo. O histórico fica neste aparelho. Para voltar, quem criou o grupo precisa adicionar você de novo.'),
-                    action: t('Sair do grupo'),
-                    danger: true,
-                    run: () => m.leaveGroup(g.id),
-                  });
+                  onConfirm(
+                    owner
+                      ? {
+                          title: t('Encerrar {name}?', { name: g.name }),
+                          body: t('O grupo termina para todos: os membros são avisados e ninguém mais consegue escrever nele. O histórico fica nos aparelhos, só para leitura. Não dá para reabrir; para conversar de novo, crie outro grupo.'),
+                          action: t('Encerrar o grupo'),
+                          danger: true,
+                          run: () => m.leaveGroup(g.id),
+                        }
+                      : {
+                          title: t('Sair de {name}?', { name: g.name }),
+                          body: t('Os membros são avisados e você para de receber as mensagens do grupo. O histórico fica neste aparelho. Para voltar, quem criou o grupo precisa adicionar você de novo.'),
+                          action: t('Sair do grupo'),
+                          danger: true,
+                          run: () => m.leaveGroup(g.id),
+                        },
+                  );
                 }}
               >
-                {t('Sair do grupo')}
+                {owner ? t('Encerrar o grupo') : t('Sair do grupo')}
               </button>
             )}
             <button
@@ -1113,7 +1123,9 @@ function GroupConversation({
                   title: t('Apagar o grupo deste aparelho?'),
                   body: g.left
                     ? t('O histórico do grupo será apagado deste aparelho e não poderá ser recuperado.')
-                    : t('Você sai do grupo (os membros são avisados) e o histórico é apagado deste aparelho.'),
+                    : owner
+                      ? t('O grupo é encerrado para todos os membros (eles são avisados e não conseguem mais escrever nele) e o histórico é apagado deste aparelho.')
+                      : t('Você sai do grupo (os membros são avisados) e o histórico é apagado deste aparelho.'),
                   action: t('Apagar grupo'),
                   danger: true,
                   run: async () => {
@@ -1129,7 +1141,15 @@ function GroupConversation({
         </details>
       </header>
 
-      {g.left && <p className="banner">{t('Você não faz mais parte deste grupo. O histórico fica só para leitura.')}</p>}
+      {g.left && (
+        <p className="banner">
+          {g.ended
+            ? g.owner === m.mailbox
+              ? t('Você encerrou este grupo. O histórico fica só para leitura.')
+              : t('Quem criou este grupo o encerrou. O histórico fica só para leitura.')
+            : t('Você não faz mais parte deste grupo. O histórico fica só para leitura.')}
+        </p>
+      )}
 
       <Thread
         m={m}

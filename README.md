@@ -177,7 +177,7 @@ O backup é cifrado com a sua senha local; quem tiver o arquivo pode tentar adiv
 ![Conversa em grupo](docs/imagens/app-grupo.png)
 
 - **Grupo** (ao lado de "Nova conversa") cria um grupo com até 19 contatos seus. Cada mensagem é cifrada separadamente para cada membro; a instância não sabe que o grupo existe.
-- Só quem criou o grupo adiciona ou remove pessoas e muda o prazo das mensagens temporárias. Qualquer um pode sair. Os membros veem a lista e as mensagens de todos, inclusive de quem não é seu contato (aparece pelo nome que escolheu, marcado como "não é seu contato"). Para conferir a identidade de alguém, adicione o convite dessa pessoa e compare o código de segurança.
+- Só quem criou o grupo adiciona ou remove pessoas e muda o prazo das mensagens temporárias. Qualquer um pode sair. Se quem criou sair ou apagar o grupo, ele é **encerrado para todos**: os membros são avisados, ninguém mais consegue escrever nele e o histórico fica só para leitura. Os membros veem a lista e as mensagens de todos, inclusive de quem não é seu contato (aparece pelo nome que escolheu, marcado como "não é seu contato"). Para conferir a identidade de alguém, adicione o convite dessa pessoa e compare o código de segurança.
 
 ### Responder, reagir e mensagens temporárias
 

@@ -403,3 +403,32 @@ test('a stranger using a contact name is flagged until verified', opts, async ()
     for (const m of [alice, ana, impostor]) m.close();
   }
 });
+
+test('the owner deleting a group ends it for everyone; nobody else can end it', opts, async () => {
+  const alice = await Messenger.create('alice passphrase end', deps());
+  const bob = await Messenger.create('bob passphrase end', deps());
+  const carol = await Messenger.create('carol passphrase end', deps());
+  try {
+    await alice.addContact(bob.mailbox, 'Bob');
+    await alice.addContact(carol.mailbox, 'Carol');
+    const g = await alice.createGroup('Encerrável', [bob.mailbox, carol.mailbox]);
+    const key = GROUP_PREFIX + g.id;
+    await waitFor(() => bob.group(g.id) !== undefined && carol.group(g.id) !== undefined);
+
+    // Bob is not the owner: his "end" is ignored and the group goes on.
+    await (bob as unknown as { deliver(mb: string, p: object): Promise<void> }).deliver(carol.mailbox, { k: 'gend', g: g.id });
+    await bob.send(key, 'ainda aberto');
+    await waitFor(() => carol.group(g.id)!.messages.some((m) => m.text === 'ainda aberto'));
+    assert.equal(carol.group(g.id)!.ended, undefined);
+
+    // The owner deletes it: every member sees it ended and can no longer write.
+    await alice.deleteGroup(g.id);
+    assert.equal(alice.group(g.id), undefined, 'gone from the owner device');
+    await waitFor(() => bob.group(g.id)!.ended === true && carol.group(g.id)!.ended === true);
+    assert.equal(bob.group(g.id)!.left, true);
+    await assert.rejects(bob.send(key, 'alguém aí?'), { message: 'bad_message' });
+    assert.equal(bob.group(g.id)!.messages.length, 1, 'history stays, read-only');
+  } finally {
+    for (const m of [alice, bob, carol]) m.close();
+  }
+});

@@ -78,6 +78,8 @@ export interface Group extends Thread {
   messages: Message[];
   /** We left or were removed: history stays, nothing more is sent or accepted. */
   left?: boolean;
+  /** Its owner ended it for everyone (also sets `left`). */
+  ended?: boolean;
 }
 
 /** Thread keys: a contact's mailbox, or this prefix plus a group id. */
@@ -642,11 +644,20 @@ export class Messenger {
   }
 
   /** Leaves for good: members are told, the history stays here (read-only). */
+  /**
+   * A member leaves for good: the others are told, the history stays here (read-only).
+   * The owner leaving ends the group for everyone, since nobody else could manage it.
+   */
   async leaveGroup(id: string): Promise<void> {
     const g = this.group(id);
     if (!g || g.left) return;
     const to = this.othersIn(g);
     g.left = true;
+    if (g.owner === this.mailbox) {
+      g.ended = true;
+      await this.fanout({ to, g: id }, { k: 'gend' });
+      return;
+    }
     g.members = g.members.filter((mb) => mb !== this.mailbox);
     await this.fanout({ to, g: id }, { k: 'gleave' });
   }
@@ -783,10 +794,19 @@ export class Messenger {
         g.name = name;
         g.members = members;
         g.left = members.includes(this.mailbox) ? undefined : true;
+        if (!g.left) g.ended = undefined;
       }
       return false;
     }
     if (!g || g.left || !g.members.includes(from)) return false;
+    // Only the owner ends a group; from anyone else this is ignored.
+    if (p.k === 'gend') {
+      if (from === g.owner) {
+        g.left = true;
+        g.ended = true;
+      }
+      return false;
+    }
     if (p.k === 'gleave') {
       g.members = g.members.filter((mb) => mb !== from);
       return false;

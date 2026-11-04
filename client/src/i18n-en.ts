@@ -301,4 +301,11 @@ export const EN: Record<string, string> = {
   'Contas registradas ({n})': 'Registered accounts ({n})',
   'Todas as identidades já criadas nesta instância, online ou não, pelo identificador da caixa (o mesmo que vai no convite da pessoa). A instância não registra quem está online, nem nomes ou quem conversa com quem.': 'Every identity ever created on this instance, online or not, by mailbox id (the same one in the person\'s invite). The instance does not record who is online, nor names or who talks to whom.',
   'Remover apaga desta instância as chaves públicas da caixa e as mensagens que esperavam entrega, que se perdem. Não impede a pessoa de voltar: ao desbloquear o Privatum, a conta é recriada sozinha. Serve para limpar contas abandonadas ou de teste. Para manter alguém fora, troque o endereço da instância. As conversas no navegador dela não são apagadas.': 'Removing deletes the mailbox\'s public keys from this instance, and the messages awaiting delivery are lost. It does not keep the person out: when they unlock Privatum, the account is recreated on its own. Use it to clean up abandoned or test accounts. To keep someone out, change the instance address. The conversations in their browser are not erased.',
+  'Encerrar {name}?': 'End {name}?',
+  'O grupo termina para todos: os membros são avisados e ninguém mais consegue escrever nele. O histórico fica nos aparelhos, só para leitura. Não dá para reabrir; para conversar de novo, crie outro grupo.': 'The group ends for everyone: the members are told and nobody can write in it anymore. The history stays on the devices, read-only. It cannot be reopened; to talk again, create another group.',
+  'Encerrar o grupo': 'End the group',
+  'O grupo é encerrado para todos os membros (eles são avisados e não conseguem mais escrever nele) e o histórico é apagado deste aparelho.': 'The group is ended for all members (they are told and can no longer write in it) and the history is erased from this device.',
+  'Você encerrou este grupo. O histórico fica só para leitura.': 'You ended this group. The history is read-only.',
+  'Quem criou este grupo o encerrou. O histórico fica só para leitura.': 'The group creator ended this group. The history is read-only.',
+  'encerrado': 'ended',
 };
