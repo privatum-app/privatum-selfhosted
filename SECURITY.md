@@ -41,6 +41,6 @@ Este projeto **não** afirma ser "100% seguro", ter "sigilo perfeito" ou ser "an
 
 ## Como relatar uma vulnerabilidade
 
-Canal de contato: **a definir** antes da abertura do repositório.
+Envie para **contato@privatum.app**, com "Segurança" no assunto: o que encontrou, como reproduzir e a versão afetada. A resposta pode levar alguns dias: o projeto é mantido por uma pessoa.
 
-Até lá, não abra issue pública com detalhes de vulnerabilidade.
+Não abra issue pública com detalhes de vulnerabilidade antes de uma correção estar publicada.

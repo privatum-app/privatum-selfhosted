@@ -48,5 +48,5 @@ As funcionalidades estão fechadas na **0.2.0**: daqui em diante só testes e co
 1. Publicar a release v0.2.0 (tag `v*`) e conferir o pacote simples.
 2. Testar no Tor Browser real as funções da 0.2 (grupos, respostas, reações, temporárias, busca, nome repetido, inglês) e o nível Safer.
 3. Testar o pacote simples em Windows e Linux; testar o Onion Browser no iPhone.
-4. Testar build reproduzível; definir o canal para relatar vulnerabilidades (`SECURITY.md` está "a definir").
+4. Testar build reproduzível. Canal de vulnerabilidades: contato@privatum.app (`SECURITY.md`).
 5. Depois: Fase 2 (app local opcional e Arti) e Fase 3 (auditoria externa antes de abrir ao público).
