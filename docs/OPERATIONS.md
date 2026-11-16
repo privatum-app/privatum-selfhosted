@@ -136,10 +136,10 @@ As imagens publicadas (`ghcr.io/privatum-app/privatum-relay` e `ghcr.io/privatum
 Para conferir a assinatura, use o **cosign 3** ou mais novo (troque a versão). Desde a v0.2.0 as imagens são assinadas com o cosign 3, que guarda a assinatura num formato novo: o cosign 2 responde “no signatures found” mesmo com a assinatura lá.
 
 ```bash
-cosign verify ghcr.io/privatum-app/privatum-relay:v0.2.0 --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp '^https://github.com/privatum-app/privatum-selfhosted/\.github/workflows/release\.yml@refs/tags/v'
+cosign verify ghcr.io/privatum-app/privatum-relay:v0.2.1 --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp '^https://github.com/privatum-app/privatum-selfhosted/\.github/workflows/release\.yml@refs/tags/v'
 ```
 
-Repita com `privatum-tor`. O resultado esperado inclui “The cosign claims were validated”; com outra identidade no lugar da do workflow, a verificação tem que falhar. Para ver o SBOM: `docker buildx imagetools inspect ghcr.io/privatum-app/privatum-relay:v0.2.0 --format '{{ json .SBOM }}'`.
+Repita com `privatum-tor`. A v0.2.0 foi publicada antes da mudança para a organização: as imagens dela ficam em `ghcr.io/privatum-app/...` e a identidade é `https://github.com/privatum-app/privatum-selfhosted/...`. O resultado esperado inclui “The cosign claims were validated”; com outra identidade no lugar da do workflow, a verificação tem que falhar. Para ver o SBOM: `docker buildx imagetools inspect ghcr.io/privatum-app/privatum-relay:v0.2.1 --format '{{ json .SBOM }}'`.
 
 ## Atualizar
 
