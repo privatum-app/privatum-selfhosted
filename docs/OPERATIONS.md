@@ -153,6 +153,6 @@ O serviço onion esconde o IP do servidor de quem usa. Ele **não** esconde voc�
 
 ## Build reproduzível
 
-Conferido em 2026-11-17: a imagem arm64 do relay da v0.2.2, montada no GitHub, e a mesma imagem montada num Mac (Apple Silicon) têm os 42 arquivos idênticos (binários do relay e do painel, cliente, painel web e WASM). Para repetir: `docker build -f deploy/relay.Dockerfile -t privatum-relay:local .` e compare os arquivos de `/usr/local/bin/privatum-*` e `/srv` com os da imagem publicada. O WASM é sempre compilado como linux/amd64, porque o compilador gera um WASM diferente conforme o processador da máquina; em outras máquinas essa etapa roda emulada e demora mais.
+Conferido em 2026-11-17: a imagem arm64 do relay da v0.2.3, montada no GitHub, e a mesma imagem montada num Mac (Apple Silicon) têm os 42 arquivos idênticos (binários do relay e do painel, cliente, painel web e WASM). Para repetir: `docker build -f deploy/relay.Dockerfile -t privatum-relay:local .` e compare os arquivos de `/usr/local/bin/privatum-*` e `/srv` com os da imagem publicada. O WASM é sempre compilado como linux/amd64, porque o compilador gera um WASM diferente conforme o processador da máquina; em outras máquinas essa etapa roda emulada e demora mais.
 
 Ainda não conferido: a imagem amd64 do relay e a imagem do Tor (que instala pacotes do repositório do Tor).

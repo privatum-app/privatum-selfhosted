@@ -48,5 +48,5 @@ As funcionalidades estão fechadas na **0.2.0**: daqui em diante só testes e co
 1. Publicar a release v0.2.0 (tag `v*`) e conferir o pacote simples.
 2. Testar no Tor Browser real as funções da 0.2 (grupos, respostas, reações, temporárias, busca, nome repetido, inglês) e o nível Safer.
 3. Testar o pacote simples em Windows e Linux; testar o Onion Browser no iPhone.
-4. Build reproduzível: a imagem arm64 do relay da v0.2.2 (CI) e um build no Mac deram os 42 arquivos idênticos em 2026-11-17, depois de fixar a etapa do WASM em linux/amd64. Falta conferir a imagem amd64 do relay e a do Tor. Canal de vulnerabilidades: contato@privatum.app (`SECURITY.md`).
+4. Build reproduzível: a imagem arm64 do relay da v0.2.3 (CI) e um build no Mac deram os 42 arquivos idênticos em 2026-11-17, depois de fixar a etapa do WASM em linux/amd64. Falta conferir a imagem amd64 do relay e a do Tor. Canal de vulnerabilidades: contato@privatum.app (`SECURITY.md`).
 5. Depois: Fase 2 (app local opcional e Arti) e Fase 3 (auditoria externa antes de abrir ao público).
