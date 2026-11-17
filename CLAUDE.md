@@ -34,7 +34,7 @@ Rust não está instalado na máquina: tudo compila em contêiner.
 
 - Não escrever criptografia própria. Usar só as primitivas do vodozemac e da WebCrypto.
 - Toda mudança de segurança passa pelos requisitos R1–R10 de `docs/THREAT-MODEL.md`. Verificação que falha deve bloquear (falhar fechado).
-- Imagens: sem root, sistema de arquivos somente leitura, sem segredos, bases fixadas por digest. Releases (tag `v*`) publicam imagens amd64/arm64 assinadas com cosign e com SBOM via `.github/workflows/release.yml`, mais o pacote simples (`deploy/release/make-bundle.sh`). Pendente: verificar build reproduzível.
+- Imagens: sem root, sistema de arquivos somente leitura, sem segredos, bases fixadas por digest. Releases (tag `v*`) publicam imagens amd64/arm64 assinadas com cosign e com SBOM via `.github/workflows/release.yml`, mais o pacote simples (`deploy/release/make-bundle.sh`).
 - A chave do serviço onion fica no volume `privatum_tor-state`; documentar backup e permissões em `docs/OPERATIONS.md`.
 - Não afirmar "100% seguro", "sigilo perfeito" ou "anônimo". O anonimato depende de como a pessoa hospeda e usa; o cliente exige o nível Standard do Tor Browser (WASM).
 - Não commitar `.env`, chaves, bancos SQLite, backups da chave onion nem `node_modules`.
@@ -48,5 +48,5 @@ As funcionalidades estão fechadas na **0.2.0**: daqui em diante só testes e co
 1. Publicar a release v0.2.0 (tag `v*`) e conferir o pacote simples.
 2. Testar no Tor Browser real as funções da 0.2 (grupos, respostas, reações, temporárias, busca, nome repetido, inglês) e o nível Safer.
 3. Testar o pacote simples em Windows e Linux; testar o Onion Browser no iPhone.
-4. Build reproduzível: duas compilações limpas da imagem do relay no Mac (arm64) deram os 42 arquivos idênticos (binários, cliente, painel, WASM) em 2026-11-16. Falta comparar com a imagem amd64 do CI. Canal de vulnerabilidades: contato@privatum.app (`SECURITY.md`).
+4. Build reproduzível: a imagem arm64 do relay da v0.2.2 (CI) e um build no Mac deram os 42 arquivos idênticos em 2026-11-17, depois de fixar a etapa do WASM em linux/amd64. Falta conferir a imagem amd64 do relay e a do Tor. Canal de vulnerabilidades: contato@privatum.app (`SECURITY.md`).
 5. Depois: Fase 2 (app local opcional e Arti) e Fase 3 (auditoria externa antes de abrir ao público).
