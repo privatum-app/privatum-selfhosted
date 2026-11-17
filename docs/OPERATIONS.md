@@ -136,10 +136,12 @@ As imagens publicadas (`ghcr.io/privatum-app/privatum-relay` e `ghcr.io/privatum
 Para conferir a assinatura, use o **cosign 3** ou mais novo (troque a versão). Desde a v0.2.0 as imagens são assinadas com o cosign 3, que guarda a assinatura num formato novo: o cosign 2 responde “no signatures found” mesmo com a assinatura lá.
 
 ```bash
-cosign verify ghcr.io/privatum-app/privatum-relay:v0.2.2 --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp '^https://github.com/privatum-app/privatum-selfhosted/\.github/workflows/release\.yml@refs/tags/v'
+cosign verify ghcr.io/privatum-app/privatum-relay:v0.2.3 --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp '^https://github.com/privatum-app/privatum-selfhosted/\.github/workflows/release\.yml@refs/tags/v'
 ```
 
-Repita com `privatum-tor`. O resultado esperado inclui “The cosign claims were validated”; com outra identidade no lugar da do workflow, a verificação tem que falhar. Para ver o SBOM: `docker buildx imagetools inspect ghcr.io/privatum-app/privatum-relay:v0.2.2 --format '{{ json .SBOM }}'`.
+Repita com `privatum-tor`. O resultado esperado inclui “The cosign claims were validated”; com outra identidade no lugar da do workflow, a verificação tem que falhar. Para ver o SBOM: `docker buildx imagetools inspect ghcr.io/privatum-app/privatum-relay:v0.2.3 --format '{{ json .SBOM }}'`.
+
+A assinatura e o SBOM ficam no próprio pacote, como versões **sem etiqueta** criadas no mesmo horário da release. Ao limpar versões antigas no GitHub (Packages → Manage versions), nunca apague as sem etiqueta de uma release publicada: sem elas o `cosign verify` responde “no signatures found”.
 
 ## Atualizar
 
