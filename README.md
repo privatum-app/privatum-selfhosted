@@ -2,7 +2,7 @@
 
 Chat com criptografia de ponta a ponta que qualquer pessoa sobe na própria máquina com Docker. A instância é publicada como serviço onion do Tor e você convida pessoas por um link que leva o endereço `.onion` e a impressão digital da sua chave. Licença AGPL-3.0, sem fins comerciais.
 
-> **Versão 0.2.1: funcionalidades fechadas, em fase de testes.** É pré-alfa e **não passou por auditoria externa. Não use para nada sensível.** Leia [SECURITY.md](SECURITY.md) e [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) antes: lá está o que o projeto protege e, principalmente, o que **não** protege.
+> **Versão 0.2.2: funcionalidades fechadas, em fase de testes.** É pré-alfa e **não passou por auditoria externa. Não use para nada sensível.** Leia [SECURITY.md](SECURITY.md) e [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) antes: lá está o que o projeto protege e, principalmente, o que **não** protege.
 
 ![Conversa no Privatum: lista de conversas, resposta citada, reações e divisória de mensagens novas](docs/imagens/app-conversa.png)
 
@@ -230,7 +230,7 @@ No Tor Browser para Android, a lista de conversas e a conversa ocupam a tela int
 | Grupos (inclusive encerrar o grupo), reações, busca, avatar, inglês, conta removida pelo painel com o app aberto | testado no Tor Browser (Android e macOS) |
 | Respostas, mensagens temporárias, troca de nome, nome repetido | testado em testes automáticos e num navegador local; **falta conferir no Tor Browser** |
 | Nível Safer do Tor Browser (deve mostrar a tela de ajuda) | testado |
-| Pacote simples da v0.2.1 | **não testado** |
+| Pacote simples da v0.2.2 | **não testado** |
 | Onion Browser (iPhone), Brave com Tor | **não testado** |
 
 ## Como funciona
