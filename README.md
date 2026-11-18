@@ -104,15 +104,15 @@ Os comandos abaixo instalam o Docker pelo repositório oficial do Docker, que j�
    docker compose version
    ```
 
-4. Baixe o `privatum-vX.Y.Z.zip` mais recente em [Releases](../../releases) e inicie (troque `X.Y.Z` pela versão baixada):
+4. Baixe a versão mais recente e inicie. O comando acha sozinho o pacote mais novo em [Releases](../../releases) e o extrai na sua pasta pessoal (`~/privatum-v…`):
 
    ```bash
-   cd ~/Downloads && unzip privatum-vX.Y.Z.zip && cd privatum-vX.Y.Z && ./iniciar.sh
+   U=$(curl -fsSL https://api.github.com/repos/privatum-app/privatum-selfhosted/releases | grep -o 'https://[^"]*/privatum-v[^"]*\.zip' | head -1) && cd ~ && curl -fLO "$U" && Z=$(basename "$U") && unzip -o "$Z" && cd "${Z%.zip}" && ./iniciar.sh
    ```
 
 5. Na primeira vez ele baixa as imagens (cerca de 200 MB). No fim, o [painel](#o-painel) abre no navegador em `http://127.0.0.1:8099`. Num servidor sem tela, abra o painel pelo seu computador com um túnel SSH, `ssh -L 8099:127.0.0.1:8099 usuario@servidor`, e acesse o mesmo endereço.
 
-Para parar: `./parar.sh` na mesma pasta.
+Para parar: `./parar.sh` dentro da pasta `~/privatum-v…`. Para iniciar de novo depois: `./iniciar.sh` na mesma pasta.
 
 ### Depois de iniciar
 
