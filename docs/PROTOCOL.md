@@ -1,6 +1,6 @@
 # Protocolo do relay e do convite — Fase 1
 
-> Estado: **especificação em rascunho**, nada implementado. Requisitos R1–R10 e limites L1–L8 vêm de [THREAT-MODEL.md](THREAT-MODEL.md).
+> Estado: **implementado** (versão 0.2.4, pré-alfa, sem auditoria externa). Requisitos R1–R10 e limites L1–L10 vêm de [THREAT-MODEL.md](THREAT-MODEL.md).
 
 ## Decisões
 
@@ -10,7 +10,7 @@
 | Relay | **Rust** (axum + tokio + SQLite). Assinaturas verificadas com `ed25519-dalek`. |
 | Cliente | Novo, enxuto (Vite + React + TypeScript), reaproveitando só componentes visuais do cliente antigo. |
 | Transporte | HTTP + WebSocket dentro do serviço onion. Sem TLS próprio. |
-| Escopo da Fase 1 | Conversa 1:1, só texto, um dispositivo por identidade. Arquivos, grupos e multi-dispositivo ficam para depois. |
+| Escopo da Fase 1 | Conversas 1:1 e grupos de até 20 pessoas (por sessões de um para um), só texto, um dispositivo por identidade. Arquivos e multi-dispositivo ficam para depois. |
 
 ## 1. Identidade e endereço autocertificável
 
@@ -109,15 +109,15 @@ deploy/
   torrc               # HiddenServiceDir no volume, HiddenServicePort 80 -> relay:8080
 ```
 
-Volumes: `relay-data` (SQLite) e `tor-keys` (`0700`, chave do serviço onion). Compilação de Rust e WASM dentro de contêineres; nada precisa ser instalado na máquina de quem hospeda além do Docker.
+Volumes: `relay-data` (SQLite), `tor-state` (`0700`, chave do serviço onion), `onion-hostname`, `admin-data` e `admin-token` (painel); detalhes e backup em [OPERATIONS.md](OPERATIONS.md). Compilação de Rust e WASM dentro de contêineres; nada precisa ser instalado na máquina de quem hospeda além do Docker.
 
-## 8. Ordem de implementação (Etapa 3)
+## 8. Ordem de implementação (Etapa 3, concluída)
 
 1. **3b — Relay** em Rust: rotas acima, SQLite, limites de taxa, cabeçalhos, testes de integração.
 2. **3c — Docker + Tor**: `docker compose up` publica o relay como `.onion`.
 3. **3d — Cola WASM** sobre o vodozemac (`wasm-bindgen`): só expor `Account`, `Session` e *pickle*; nenhuma lógica criptográfica nova.
 4. **3e — Cliente** novo: criar identidade, senha local, convite, conversa, verificação do endereço autocertificável.
-5. **3f — Teste ponta a ponta** com dois perfis do Tor Browser em nível Standard. *Feito em 2026-10-20:* Tor Browser (nível Standard) → `.onion` → relay, conversando com um participante de teste no Node ligado à rede interna da instância. Mensagens nos dois sentidos, contato que iniciou a conversa marcado como "não verificado". Ainda não testado: dois Tor Browsers reais, o aviso no nível Safer, e a reconexão após o token expirar (15 min).
+5. **3f — Teste ponta a ponta** com dois perfis do Tor Browser em nível Standard. *Feito em 2026-10-20:* Tor Browser (nível Standard) → `.onion` → relay, conversando com um participante de teste no Node ligado à rede interna da instância. Mensagens nos dois sentidos, contato que iniciou a conversa marcado como "não verificado". Depois, até a v0.2.4, testado com Tor Browsers reais no macOS e no Android (inclusive o aviso no nível Safer) e com a instância hospedada no macOS e no Linux. A reconexão depois que o token expira (15 min) não foi testada isoladamente.
 6. **3g — Limpeza**: remover Supabase, Stripe, funções de borda, migrações e documentação do Privatum comercial. *Feito em 2026-10-20*, com o histórico do Git recomeçado do zero.
 
 Depois: Fase 2 (app local, Arti), Fase 3 (auditoria externa e lançamento).
