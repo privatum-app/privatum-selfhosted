@@ -133,6 +133,25 @@ async fn auth_rejects_wrong_host_and_nonce_is_single_use() {
 }
 
 #[tokio::test]
+async fn challenge_limit_is_per_mailbox_and_unknown_mailboxes_get_none() {
+    let r = router();
+    let (victim, attacker) = (User::new(), User::new());
+    victim.register(&r).await;
+    attacker.register(&r).await;
+    let ask = |id: &str| call(&r, "POST", "/v1/auth/challenge", None, json!({ "mailbox_id": id }));
+
+    assert_eq!(ask(&User::new().id).await.0, StatusCode::UNAUTHORIZED);
+    // Flooding one mailbox's challenges only exhausts that mailbox's limit...
+    let mut codes = Vec::new();
+    for _ in 0..15 {
+        codes.push(ask(&attacker.id).await.0);
+    }
+    assert!(codes.contains(&StatusCode::TOO_MANY_REQUESTS));
+    // ...and everyone else can still sign in.
+    victim.login(&r).await;
+}
+
+#[tokio::test]
 async fn endpoints_require_token() {
     let r = router();
     assert_eq!(call(&r, "PUT", "/v1/keys", None, json!({})).await.0, StatusCode::UNAUTHORIZED);

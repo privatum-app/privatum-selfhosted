@@ -1,12 +1,12 @@
 # Protocolo do relay e do convite — Fase 1
 
-> Estado: **implementado** (versão 0.2.4, pré-alfa, sem auditoria externa). Requisitos R1–R10 e limites L1–L10 vêm de [THREAT-MODEL.md](THREAT-MODEL.md).
+> Estado: **implementado** (versão 0.2.5, pré-alfa, sem auditoria externa). Requisitos R1–R10 e limites L1–L10 vêm de [THREAT-MODEL.md](THREAT-MODEL.md).
 
 ## Decisões
 
 | Item | Escolha |
 |---|---|
-| Protocolo de mensagens | Olm (Double Ratchet) via **vodozemac 0.11.1** (fixado), compilado para WASM. Configuração de sessão **v1** (a auditada e usada pela Matrix; a v2 ainda é experimental no vodozemac). Nenhuma primitiva própria. |
+| Protocolo de mensagens | Olm (Double Ratchet) via **vodozemac 0.11.2** (fixado; a 0.11.2 só traz correções de segurança sobre a 0.11.1, sem mudar o formato dos dados salvos), compilado para WASM. Configuração de sessão **v1** (a auditada e usada pela Matrix; a v2 ainda é experimental no vodozemac). Nenhuma primitiva própria. |
 | Relay | **Rust** (axum + tokio + SQLite). Assinaturas verificadas com `ed25519-dalek`. |
 | Cliente | Novo, enxuto (Vite + React + TypeScript), reaproveitando só componentes visuais do cliente antigo. |
 | Transporte | HTTP + WebSocket dentro do serviço onion. Sem TLS próprio. |
@@ -39,7 +39,7 @@ http://<56 caracteres>.onion/#c=<mailbox_id>
 
 O relay nunca recebe senha.
 
-1. `POST /v1/auth/challenge {mailbox_id}` → `{nonce}` (32 bytes aleatórios, vale 60 s, uso único).
+1. `POST /v1/auth/challenge {mailbox_id}` → `{nonce}` (32 bytes aleatórios, vale 60 s, uso único). Só para caixas registradas (senão `401`); limite de 10 por minuto por caixa, para que ninguém trave o login de todos.
 2. O cliente assina `"privatum-auth-v1" || onion_host || nonce` com a Ed25519 da `Account`.
 3. `POST /v1/auth/verify {mailbox_id, nonce, signature}` → `{token}` (aleatório, 32 bytes, vale 15 min, guardado só em memória no cliente e como hash no relay).
 

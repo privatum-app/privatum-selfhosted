@@ -393,7 +393,15 @@ struct ChallengeReq {
 }
 
 async fn challenge(State(s): State<Shared>, Json(req): Json<ChallengeReq>) -> Result<Response, Response> {
-    s.rate("global:challenge", 120.0)?;
+    // The limit is per mailbox, so whoever has the onion address cannot lock everyone out;
+    // the global one is only a safety net, high enough to stay below MAX_NONCES per NONCE_TTL.
+    s.rate("global:challenge", 6000.0)?;
+    // Unknown mailboxes get no nonce (401 makes a removed mailbox's app register again),
+    // so made-up ids cannot fill the nonce table or the rate-limit buckets.
+    if s.ed25519_of(&req.mailbox_id)?.is_none() {
+        return Err(err(StatusCode::UNAUTHORIZED, "unauthorized"));
+    }
+    s.rate(&format!("challenge:{}", req.mailbox_id), 10.0)?;
     let nonce = BASE64_NOPAD.encode(&random32());
     let mut nonces = lock(&s.nonces);
     if nonces.len() >= MAX_NONCES {

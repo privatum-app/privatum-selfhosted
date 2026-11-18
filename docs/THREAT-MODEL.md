@@ -1,6 +1,6 @@
 # Modelo de ameaças — Privatum autohospedado
 
-> Estado: **Fase 1, pré-alfa, implementada** (versão 0.2.4). O sistema descrito aqui está em uso, mas **não passou por auditoria externa**: não use para nada sensível.
+> Estado: **Fase 1, pré-alfa, implementada** (versão 0.2.5). O sistema descrito aqui está em uso, mas **não passou por auditoria externa**: não use para nada sensível.
 > Este projeto nasceu de um sistema anterior (Supabase + Stripe), cujo código não faz parte deste repositório. A seção 6 resume o que a auditoria daquele sistema encontrou e o que este projeto evita por construção.
 
 ## 1. Sistema avaliado
@@ -61,7 +61,7 @@ Convite: `<endereço>.onion` + **impressão digital da chave de identidade** de 
 - **L4 — Primeiro contato depende do canal do convite.** Se o canal externo (mensagem, papel, QR) estiver comprometido, a impressão digital pode ser trocada junto com o endereço.
 - **L5 — Dispositivo comprometido.** Malware ou acesso físico com o cliente desbloqueado lê tudo. A senha local só protege em repouso.
 - **L6 — Anonimato não é garantido.** Depende de como a pessoa hospeda e usa: VPS pago com cartão, conta de e-mail real, horários de uso e conteúdo das mensagens identificam pessoas. Hospedar em casa atrás do Tor é melhor, mas não é prova de anonimato.
-- **L7 — Disponibilidade.** O operador pode descartar, atrasar ou recusar mensagens. O protocolo detecta adulteração, não censura.
+- **L7 — Disponibilidade.** O operador pode descartar, atrasar ou recusar mensagens. O protocolo detecta adulteração, não censura. Quem tem o endereço `.onion` também pode atrapalhar sem ser o operador: travar por um tempo o login de **uma** caixa cujo identificador conhece (o limite de login é por caixa), lotar a fila de 1000 mensagens de alguém ou criar caixas até o limite da instância. Pelo Tor não há IP para bloquear; a defesa do dono é ver as contas no painel, remover as estranhas e, se preciso, trocar o endereço.
 - **L8 — Auditoria.** O protocolo (vodozemac) foi auditado em 2022; este projeto (cola WASM, relay, cliente) **não foi auditado**. Auditoria externa é pré-requisito do lançamento público (Fase 3).
 - **L9 — O Tor Browser apaga os dados ao fechar.** Identidade, contatos e histórico só sobrevivem por meio do arquivo de backup exportado manualmente. Restaurar um backup antigo perde o que veio depois dele. Quem obtiver o arquivo pode tentar adivinhar a senha local offline (PBKDF2 com 600.000 iterações): use uma senha longa e guarde o arquivo com cuidado.
 - **L10 — iPhone e iPad não funcionam.** O cliente usa a criptografia do navegador (WebCrypto), que só existe em páginas tratadas como seguras. O Tor Browser trata `.onion` como seguro; o motor do Safari (WebKit), obrigatório em todo navegador de iPhone e iPad, inclusive o Onion Browser, não. Nesses aparelhos o app mostra um aviso e não abre. Trocar o WebCrypto por bibliotecas em JavaScript resolveria, mas mudaria a regra de usar só vodozemac e WebCrypto; fica para depois da auditoria.
