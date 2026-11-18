@@ -98,13 +98,13 @@ Os comandos abaixo instalam o Docker pelo repositório oficial do Docker, que j�
    sudo systemctl enable --now docker && sudo usermod -aG docker $USER
    ```
 
-   Depois **saia da sessão e entre de novo** (ou reinicie). Confira que o Docker responde sem `sudo` e que o Compose é da versão 2.x:
+   Depois **saia da sessão e entre de novo** (ou reinicie). Confira que o Docker responde sem `sudo` e que o Compose é da versão 2 ou mais nova:
 
    ```bash
    docker info --format 'Docker {{.ServerVersion}} OK' && docker compose version
    ```
 
-   Deve mostrar `Docker … OK` e `Docker Compose version v2…`. Se aparecer **permission denied**, você ainda não saiu e entrou de novo na sessão (ou rode `newgrp docker` e teste outra vez). Se aparecer **Cannot connect to the Docker daemon**, rode de novo `sudo systemctl enable --now docker`.
+   Deve mostrar `Docker … OK` e `Docker Compose version v2` ou mais nova (por exemplo `v5.8.0`). Se aparecer **permission denied**, você ainda não saiu e entrou de novo na sessão (ou rode `newgrp docker` e teste outra vez). Se aparecer **Cannot connect to the Docker daemon**, rode de novo `sudo systemctl enable --now docker`.
 
 4. Baixe a versão mais recente e inicie. O comando acha sozinho o pacote mais novo em [Releases](../../releases) e o extrai na sua pasta pessoal (`~/privatum-v…`):
 
