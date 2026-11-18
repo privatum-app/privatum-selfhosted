@@ -97,6 +97,7 @@ export function App() {
       .catch(() => setWasmFailed(true));
   }, []);
 
+  if (noWebCrypto) return <Welcome><BrowserHelp /></Welcome>;
   if (wasmFailed) return <Welcome><SaferHelp /></Welcome>;
   if (!deps || hasIdentity === null) return <Welcome><p className="muted">{t('Carregando a criptografia…')}</p></Welcome>;
   if (!messenger) {
@@ -152,6 +153,24 @@ function Welcome({ children }: { children: ReactNode }) {
   );
 }
 
+// WebKit (every iPhone/iPad browser, e.g. Onion Browser) hides WebCrypto on http://*.onion: it does not count it as a secure context.
+const noWebCrypto = !globalThis.crypto?.subtle;
+
+function BrowserHelp() {
+  return (
+    <div className="panel gate">
+      <h2>{t('Este navegador não é compatível')}</h2>
+      <p className="muted">
+        {t('Ele não oferece a criptografia do navegador (WebCrypto) neste endereço, e o Privatum precisa dela para proteger seus dados. Isso acontece no iPhone e no iPad: o Onion Browser e os outros navegadores de lá usam o motor do Safari.')}
+      </p>
+      <p className="muted">
+        {t('Use o Tor Browser no computador (Windows, macOS ou Linux) ou no Android, no nível de segurança Padrão (Standard).')}
+      </p>
+      <a className="btn primary" href="https://www.torproject.org/download/" target="_blank" rel="noreferrer">{t('Baixar o Tor Browser')}</a>
+    </div>
+  );
+}
+
 /**
  * The client needs WebAssembly, which Tor Browser turns off at the "Safer" and "Safest"
  * levels. Say exactly how to get back to "Standard" instead of just failing.
@@ -164,7 +183,7 @@ function SaferHelp() {
         {typeof WebAssembly === 'undefined'
           ? t('Este navegador está com o WebAssembly desligado. No Tor Browser isso acontece nos níveis "Mais seguro" (Safer) e "O mais seguro" (Safest).')
           : t('Não foi possível carregar a criptografia (WebAssembly).')}{' '}
-        O Privatum cifra tudo no seu navegador e precisa dele.
+        {t('O Privatum cifra tudo no seu navegador e precisa dele.')}
       </p>
       <ol className="steps">
         <li>{t('Toque no ícone do')}{' '}<strong>{t('escudo')}</strong>{t(', ao lado da barra de endereço (no Android: menu ⋮ → Configurações → Privacidade e segurança).')}</li>

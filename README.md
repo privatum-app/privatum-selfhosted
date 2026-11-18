@@ -2,7 +2,7 @@
 
 Chat com criptografia de ponta a ponta que qualquer pessoa sobe na própria máquina com Docker. A instância é publicada como serviço onion do Tor e você convida pessoas por um link que leva o endereço `.onion` e a impressão digital da sua chave. Licença AGPL-3.0, sem fins comerciais.
 
-> **Versão 0.2.3: funcionalidades fechadas, em fase de testes.** É pré-alfa e **não passou por auditoria externa. Não use para nada sensível.** Leia [SECURITY.md](SECURITY.md) e [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) antes: lá está o que o projeto protege e, principalmente, o que **não** protege.
+> **Versão 0.2.4: funcionalidades fechadas, em fase de testes.** É pré-alfa e **não passou por auditoria externa. Não use para nada sensível.** Leia [SECURITY.md](SECURITY.md) e [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) antes: lá está o que o projeto protege e, principalmente, o que **não** protege.
 
 ![Conversa no Privatum: lista de conversas, resposta citada, reações e divisória de mensagens novas](docs/imagens/app-conversa.png)
 
@@ -35,7 +35,7 @@ Como mudar: ícone do escudo ao lado da barra de endereço (no Android: menu ⋮
 | Papel | Precisa de | Sistema |
 |---|---|---|
 | **Quem hospeda** a instância | Docker | Windows, macOS ou Linux |
-| **Quem conversa** (inclusive quem hospeda) | Tor Browser no nível Standard | Windows, macOS, Linux ou Android |
+| **Quem conversa** (inclusive quem hospeda) | Tor Browser no nível Standard | Windows, macOS, Linux ou Android (**iPhone e iPad não**: veja [No celular](#no-celular)) |
 
 Ninguém precisa abrir portas no roteador, ter domínio, IP fixo ou certificado TLS: o Tor cuida disso.
 
@@ -285,7 +285,7 @@ O app e o painel estão em português e inglês. O botão **English / Português
 
 <img src="docs/imagens/app-celular-conversa.png" alt="Conversa no celular" width="320">
 
-No Tor Browser para Android, a lista de conversas e a conversa ocupam a tela inteira, uma de cada vez; a seta no topo volta para a lista. No iPhone não há Tor Browser oficial; o Onion Browser ainda não foi testado.
+No Tor Browser para Android, a lista de conversas e a conversa ocupam a tela inteira, uma de cada vez; a seta no topo volta para a lista. **iPhone e iPad não são compatíveis.** Não há Tor Browser oficial para eles, e todos os navegadores de lá, inclusive o Onion Browser, usam o motor do Safari, que não oferece a criptografia do navegador (WebCrypto) em endereços `http://….onion`. Sem ela o Privatum não consegue proteger os dados locais, então mostra a tela "Este navegador não é compatível". Use o Tor Browser no computador ou no Android.
 
 ## Testado até agora
 
@@ -300,8 +300,9 @@ No Tor Browser para Android, a lista de conversas e a conversa ocupam a tela int
 | Grupos (inclusive encerrar o grupo), reações, busca, avatar, inglês, conta removida pelo painel com o app aberto | testado no Tor Browser (Android e macOS) |
 | Respostas, mensagens temporárias, troca de nome, nome repetido | testado em testes automáticos e num navegador local; **falta conferir no Tor Browser** |
 | Nível Safer do Tor Browser (deve mostrar a tela de ajuda) | testado |
-| Pacote simples da v0.2.3 | testado no Linux; **falta Windows** |
-| Onion Browser (iPhone), Brave com Tor | **não testado** |
+| Pacote simples (Linux: v0.2.3) | testado no Linux; **falta Windows** |
+| Onion Browser (iPhone) | testado: **incompatível** (sem WebCrypto em `.onion`); o app mostra um aviso |
+| Brave com Tor | **não testado** |
 
 ## Como funciona
 
