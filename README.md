@@ -92,10 +92,10 @@ Os comandos abaixo instalam o Docker pelo repositório oficial do Docker, que j�
    sudo apt update && sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
    ```
 
-3. Deixe seu usuário usar o Docker sem `sudo`:
+3. Ligue o serviço do Docker (o Kali não liga serviços sozinho) e deixe seu usuário usar o Docker sem `sudo`:
 
    ```bash
-   sudo usermod -aG docker $USER
+   sudo systemctl enable --now docker && sudo usermod -aG docker $USER
    ```
 
    Depois **saia da sessão e entre de novo** (ou reinicie). Confira que responde com uma versão 2.x:
