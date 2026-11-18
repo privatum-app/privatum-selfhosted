@@ -41,17 +41,86 @@ Ninguém precisa abrir portas no roteador, ter domínio, IP fixo ou certificado 
 
 ## Instalação simples (recomendada)
 
-Não precisa de Git, terminal nem compilar nada; só do Docker.
+Não precisa de Git nem compilar nada: só do Docker e do pacote pronto da página de [Releases](../../releases). Escolha o seu sistema abaixo. Depois de instalar, siga para [Depois de iniciar](#depois-de-iniciar).
 
-1. Instale o **Docker Desktop** ([Windows](https://docs.docker.com/desktop/setup/install/windows-install/), [macOS](https://docs.docker.com/desktop/setup/install/mac-install/)) ou, no Linux, o [Docker Engine](https://docs.docker.com/engine/install/) com o plugin Compose.
-2. Baixe o arquivo `privatum-vX.Y.Z.zip` na página de [Releases](../../releases) e extraia em uma pasta qualquer.
-3. Dê **dois cliques** no atalho do seu sistema:
-   - **Windows:** `iniciar.bat`
-   - **macOS:** `iniciar.command` (na primeira vez, clique com o botão direito → **Abrir**, porque o macOS bloqueia scripts baixados da internet)
-   - **Linux:** `iniciar.sh`
-4. Na primeira vez ele baixa as imagens prontas (cerca de 200 MB). No fim, abre no navegador o [painel](#o-painel) com o **endereço `.onion`** da sua instância. Siga daí para [Conversar](#conversar).
+### Windows 10/11
 
-Para parar: `parar.bat`, `parar.command` ou `parar.sh`. Seus dados e o endereço são mantidos. As imagens são assinadas e trazem SBOM; como conferir está em [docs/OPERATIONS.md](docs/OPERATIONS.md#conferir-as-imagens).
+1. Instale o [Docker Desktop para Windows](https://docs.docker.com/desktop/setup/install/windows-install/). Aceite usar o **WSL 2** quando o instalador perguntar e reinicie o computador se ele pedir.
+2. Abra o **Docker Desktop** e espere aparecer **Engine running** no canto de baixo.
+3. Baixe o `privatum-vX.Y.Z.zip` mais recente em [Releases](../../releases).
+4. Clique com o botão direito no arquivo → **Extrair tudo…** → **Extrair**.
+5. Na pasta extraída, dê dois cliques em **`iniciar.bat`**. Se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações** → **Executar assim mesmo**.
+6. Uma janela preta mostra o andamento. Na primeira vez ele baixa as imagens (cerca de 200 MB). No fim, o [painel](#o-painel) abre no navegador.
+
+Para parar: dois cliques em `parar.bat`.
+
+### macOS (Apple Silicon ou Intel)
+
+1. Instale o [Docker Desktop para Mac](https://docs.docker.com/desktop/setup/install/mac-install/), escolhendo a versão do seu processador (Apple Silicon ou Intel).
+2. Abra o **Docker Desktop** pela pasta Aplicativos e espere ele indicar que está rodando.
+3. Baixe o `privatum-vX.Y.Z.zip` mais recente em [Releases](../../releases) e dê dois cliques nele para extrair (o Safari pode já extrair sozinho).
+4. Na pasta extraída, clique com o **botão direito** em **`iniciar.command`** → **Abrir** → **Abrir**. Na primeira vez é preciso fazer assim, porque o macOS bloqueia scripts baixados da internet; depois, dois cliques bastam.
+5. Uma janela do Terminal mostra o andamento. Na primeira vez ele baixa as imagens (cerca de 200 MB). No fim, o [painel](#o-painel) abre no navegador.
+
+Para parar: dois cliques em `parar.command`.
+
+### Linux (Debian, Ubuntu ou Kali)
+
+Os comandos abaixo instalam o Docker pelo repositório oficial do Docker, que já traz o `docker compose`. Copie e cole no terminal, um bloco por vez.
+
+1. Diga ao terminal qual é o seu sistema, rodando **só uma** destas linhas:
+
+   ```bash
+   D=ubuntu; C=$(. /etc/os-release; echo $VERSION_CODENAME)   # Ubuntu
+   ```
+
+   ```bash
+   D=debian; C=$(. /etc/os-release; echo $VERSION_CODENAME)   # Debian
+   ```
+
+   ```bash
+   D=debian; C=bookworm                                       # Kali
+   ```
+
+2. Instale o Docker (no **mesmo** terminal do passo 1):
+
+   ```bash
+   sudo apt update && sudo apt install -y ca-certificates curl unzip
+   sudo install -m 0755 -d /etc/apt/keyrings
+   sudo curl -fsSL https://download.docker.com/linux/$D/gpg -o /etc/apt/keyrings/docker.asc
+   echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$D $C stable" | sudo tee /etc/apt/sources.list.d/docker.list
+   sudo apt update && sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+   ```
+
+3. Deixe seu usuário usar o Docker sem `sudo`:
+
+   ```bash
+   sudo usermod -aG docker $USER
+   ```
+
+   Depois **saia da sessão e entre de novo** (ou reinicie). Confira que responde com uma versão 2.x:
+
+   ```bash
+   docker compose version
+   ```
+
+4. Baixe o `privatum-vX.Y.Z.zip` mais recente em [Releases](../../releases) e inicie (troque `X.Y.Z` pela versão baixada):
+
+   ```bash
+   cd ~/Downloads && unzip privatum-vX.Y.Z.zip && cd privatum-vX.Y.Z && ./iniciar.sh
+   ```
+
+5. Na primeira vez ele baixa as imagens (cerca de 200 MB). No fim, o [painel](#o-painel) abre no navegador em `http://127.0.0.1:8099`. Num servidor sem tela, abra o painel pelo seu computador com um túnel SSH, `ssh -L 8099:127.0.0.1:8099 usuario@servidor`, e acesse o mesmo endereço.
+
+Para parar: `./parar.sh` na mesma pasta.
+
+### Depois de iniciar
+
+1. No [painel](#o-painel), crie a senha do painel e copie o **endereço `.onion`** da sua instância.
+2. Abra esse endereço no [Tor Browser](https://www.torproject.org/download/), no nível de segurança **Standard**, crie sua identidade e envie o seu convite. Siga em [Conversar](#conversar).
+3. **Faça o backup da chave do endereço** no painel e guarde fora deste computador: sem ele, perder a chave muda o endereço e quebra todos os convites.
+
+Parar não apaga nada: os dados e o endereço `.onion` ficam guardados no Docker. A instância só fica no ar com o computador ligado e o Docker rodando. Para **atualizar**, baixe o pacote da versão nova e rode o `iniciar` dele: os dados continuam os mesmos. As imagens são assinadas e trazem SBOM; como conferir está em [docs/OPERATIONS.md](docs/OPERATIONS.md#conferir-as-imagens).
 
 ## Hospedar a partir do código-fonte
 
@@ -70,8 +139,6 @@ docker compose version
 ```
 
 ### 2. Baixe o projeto e suba a instância
-
-Enquanto o repositório for privado, só contas com acesso conseguem clonar.
 
 ```bash
 git clone https://github.com/privatum-app/privatum-selfhosted.git
