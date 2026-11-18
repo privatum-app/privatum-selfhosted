@@ -40,13 +40,15 @@ Rust não está instalado na máquina: tudo compila em contêiner.
 - Não commitar `.env`, chaves, bancos SQLite, backups da chave onion nem `node_modules`.
 - Commits na `main` só quando pedido; **nunca fazer push** sem pedido explícito.
 - Não fazer testes ativos contra servidores de terceiros sem confirmação na hora.
+- GitHub (`privatum-app/privatum-selfhosted`, público desde 2026-11-17): só o dono grava; a organização exige 2FA. Rulesets sem exceção: `main` não pode ser apagada nem receber push forçado; tags `v*` não podem ser movidas nem apagadas. Release que falhar ou sair errada vira **versão nova** (foi assim de v0.2.1 a v0.2.3), nunca a mesma tag de novo. Reescrever histórico exige desligar a regra da `main` de propósito.
+- Nunca apagar versões sem etiqueta dos pacotes de uma release publicada: guardam a assinatura cosign e o SBOM.
+- O Tor é fixado numa versão exata e o repositório do Tor só mantém a mais recente: quando sair versão nova do Tor, a release falha até atualizar `TOR_VERSION` em `deploy/tor.Dockerfile`.
 
 ## Próximos passos
 
-As funcionalidades estão fechadas na **0.2.0**: daqui em diante só testes e correções do que eles encontrarem, sem funções novas.
+As funcionalidades estão fechadas na **0.2**: daqui em diante só testes e correções do que eles encontrarem, sem funções novas. Versão oficial publicada: **v0.2.3** (repositório e imagens públicos).
 
-1. Publicar a release v0.2.0 (tag `v*`) e conferir o pacote simples.
-2. Testar no Tor Browser real as funções da 0.2 (grupos, respostas, reações, temporárias, busca, nome repetido, inglês) e o nível Safer.
-3. Testar o pacote simples em Windows e Linux; testar o Onion Browser no iPhone.
-4. Build reproduzível: a imagem arm64 do relay da v0.2.3 (CI) e um build no Mac deram os 42 arquivos idênticos em 2026-11-17, depois de fixar a etapa do WASM em linux/amd64. Falta conferir a imagem amd64 do relay e a do Tor. Canal de vulnerabilidades: contato@privatum.app (`SECURITY.md`).
-5. Depois: Fase 2 (app local opcional e Arti) e Fase 3 (auditoria externa antes de abrir ao público).
+1. Testes no Tor Browser que faltam: mensagens temporárias, troca de nome, alerta de nome repetido (3 contas) e Onion Browser no iPhone.
+2. Testar o pacote simples em Linux e Windows.
+3. Build reproduzível: a imagem arm64 do relay da v0.2.3 (CI) e um build no Mac deram os 42 arquivos idênticos em 2026-11-17, depois de fixar a etapa do WASM em linux/amd64. Falta conferir a imagem amd64 do relay e a do Tor. Canal de vulnerabilidades: contato@privatum.app (`SECURITY.md`).
+4. Depois: Fase 2 (app local opcional e Arti) e Fase 3 (auditoria externa antes de divulgar ao público em geral).
