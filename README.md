@@ -98,11 +98,13 @@ Os comandos abaixo instalam o Docker pelo repositório oficial do Docker, que j�
    sudo systemctl enable --now docker && sudo usermod -aG docker $USER
    ```
 
-   Depois **saia da sessão e entre de novo** (ou reinicie). Confira que responde com uma versão 2.x:
+   Depois **saia da sessão e entre de novo** (ou reinicie). Confira que o Docker responde sem `sudo` e que o Compose é da versão 2.x:
 
    ```bash
-   docker compose version
+   docker info --format 'Docker {{.ServerVersion}} OK' && docker compose version
    ```
+
+   Deve mostrar `Docker … OK` e `Docker Compose version v2…`. Se aparecer **permission denied**, você ainda não saiu e entrou de novo na sessão (ou rode `newgrp docker` e teste outra vez). Se aparecer **Cannot connect to the Docker daemon**, rode de novo `sudo systemctl enable --now docker`.
 
 4. Baixe a versão mais recente e inicie. O comando acha sozinho o pacote mais novo em [Releases](../../releases) e o extrai na sua pasta pessoal (`~/privatum-v…`):
 
@@ -290,14 +292,15 @@ No Tor Browser para Android, a lista de conversas e a conversa ocupam a tela int
 | | Status |
 |---|---|
 | Hospedar no macOS (Apple Silicon), inclusive pelo pacote simples da v0.1.0 | testado |
-| Hospedar no Windows ou Linux | **não testado** (imagens publicadas para amd64 e arm64; a de amd64 foi compilada e executada) |
+| Hospedar no Linux pelo pacote simples da v0.2.3 (Kali ARM64 no VirtualBox) | testado: instalação pelo README, conversa Android ↔ macOS, contas no painel, parar/iniciar mantendo endereço e conversas, backup da chave |
+| Hospedar no Windows | **não testado** (imagens publicadas para amd64 e arm64; a de amd64 foi compilada e executada) |
 | Conversar pelo Tor Browser no computador e no Android (15.0.24, 4G e Wi-Fi) | testado (funções da v0.1) |
 | Mensagem enviada com o destinatário offline e recebida depois de restaurar o backup | testado (Android → macOS) |
 | Painel: endereço, backup, restauração e troca do endereço, contas | testado (instância de teste e instância real no macOS) |
 | Grupos (inclusive encerrar o grupo), reações, busca, avatar, inglês, conta removida pelo painel com o app aberto | testado no Tor Browser (Android e macOS) |
 | Respostas, mensagens temporárias, troca de nome, nome repetido | testado em testes automáticos e num navegador local; **falta conferir no Tor Browser** |
 | Nível Safer do Tor Browser (deve mostrar a tela de ajuda) | testado |
-| Pacote simples da v0.2.3 | **não testado** |
+| Pacote simples da v0.2.3 | testado no Linux; **falta Windows** |
 | Onion Browser (iPhone), Brave com Tor | **não testado** |
 
 ## Como funciona
