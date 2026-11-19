@@ -1,6 +1,6 @@
 # Operação de uma instância
 
-> Estado: Fase 1, pré-alfa. A instância serve o cliente web e a API do relay no mesmo endereço `.onion`. Leia [SECURITY.md](../SECURITY.md) antes.
+> A instância serve o cliente web e a API do relay no mesmo endereço `.onion`. Leia [SECURITY.md](../SECURITY.md) antes.
 >
 > Para usar: abra o endereço `.onion` no Tor Browser no nível de segurança **Standard** (o cliente precisa de WebAssembly), crie uma identidade com uma senha local e envie o link de "Meu convite" a quem você quer adicionar.
 

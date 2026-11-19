@@ -1,7 +1,7 @@
 PRIVATUM - instalação simples
 =============================
 
-Pré-alfa, sem auditoria externa. Não use para nada sensível.
+Sem auditoria externa. Leia os limites em docs/THREAT-MODEL.md no projeto.
 
 1. Instale o Docker:
    - Windows e macOS: Docker Desktop (https://docs.docker.com/desktop/)

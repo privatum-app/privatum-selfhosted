@@ -1,6 +1,6 @@
-# Protocolo do relay e do convite — Fase 1
+# Protocolo do relay e do convite
 
-> Estado: **implementado** (versão 0.2.5, pré-alfa, sem auditoria externa). Requisitos R1–R10 e limites L1–L10 vêm de [THREAT-MODEL.md](THREAT-MODEL.md).
+> Estado: **implementado** (versão 0.2.5, sem auditoria externa). Requisitos R1–R10 e limites L1–L10 vêm de [THREAT-MODEL.md](THREAT-MODEL.md).
 
 ## Decisões
 
@@ -10,7 +10,7 @@
 | Relay | **Rust** (axum + tokio + SQLite). Assinaturas verificadas com `ed25519-dalek`. |
 | Cliente | Vite + React + TypeScript, servido pela própria instância; toda a criptografia roda no navegador. |
 | Transporte | HTTP + WebSocket dentro do serviço onion. Sem TLS próprio. |
-| Escopo da Fase 1 | Conversas 1:1 e grupos de até 20 pessoas (por sessões de um para um), só texto, um dispositivo por identidade. Arquivos e multi-dispositivo ficam para depois. |
+| Escopo | Conversas 1:1 e grupos de até 20 pessoas (por sessões de um para um), só texto, um dispositivo por identidade. Sem arquivos e sem uso em vários dispositivos ao mesmo tempo. |
 
 ## 1. Identidade e endereço autocertificável
 
@@ -114,6 +114,5 @@ Volumes: `relay-data` (SQLite), `tor-state` (`0700`, chave do serviço onion), `
 ## Em aberto
 
 - Política anti-spam para `POST /v1/messages` (hoje: só limite de taxa por caixa autenticada).
-- Ocultar o remetente do relay (*sealed sender*) — fora da Fase 1.
+- Ocultar o remetente do relay (*sealed sender*): não implementado.
 - Rotação e reposição automática das chaves de uso único.
-- Próximas fases: Fase 2 (app local opcional, Arti) e Fase 3 (auditoria externa antes de divulgar ao público em geral).

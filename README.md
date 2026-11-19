@@ -2,7 +2,7 @@
 
 Chat com criptografia de ponta a ponta que qualquer pessoa sobe na própria máquina com Docker. A instância é publicada como serviço onion do Tor e você convida pessoas por um link que leva o endereço `.onion` e a impressão digital da sua chave. Licença AGPL-3.0, sem fins comerciais.
 
-> **Versão 0.2.5: funcionalidades fechadas, em fase de testes.** É pré-alfa e **não passou por auditoria externa. Não use para nada sensível.** Leia [SECURITY.md](SECURITY.md) e [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) antes: lá está o que o projeto protege e, principalmente, o que **não** protege.
+> **Versão 0.2.5.** O projeto **não passou por auditoria externa**. Leia [SECURITY.md](SECURITY.md) e [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) antes: lá está o que o projeto protege e, principalmente, o que **não** protege.
 
 ![Conversa no Privatum: lista de conversas, resposta citada, reações e divisória de mensagens novas](docs/imagens/app-conversa.png)
 

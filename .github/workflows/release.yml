@@ -76,4 +76,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$TAG" "privatum-$TAG.zip" --prerelease --title "Privatum $TAG" --notes "Pré-alfa, sem auditoria externa. Baixe privatum-$TAG.zip, extraia e dê dois cliques em iniciar (veja LEIA-ME.txt). Imagens assinadas com cosign; verificação em docs/OPERATIONS.md."
+          gh release create "$TAG" "privatum-$TAG.zip" --prerelease --title "Privatum $TAG" --notes "Sem auditoria externa. Baixe privatum-$TAG.zip, extraia e dê dois cliques em iniciar (veja LEIA-ME.txt). Imagens assinadas com cosign; verificação em docs/OPERATIONS.md."

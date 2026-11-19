@@ -1,6 +1,6 @@
 # Modelo de ameaças — Privatum autohospedado
 
-> Estado: **Fase 1, pré-alfa, implementada** (versão 0.2.5). O sistema descrito aqui está em uso, mas **não passou por auditoria externa**: não use para nada sensível.
+> Estado: **implementado** (versão 0.2.5). O sistema descrito aqui está em uso e **não passou por auditoria externa**.
 
 ## 1. Sistema avaliado
 
@@ -52,18 +52,18 @@ Convite: `<endereço>.onion` + **impressão digital da chave de identidade** de 
 
 \* Desde que o cliente executado seja o legítimo (L1).
 
-## 5. Limites conhecidos (dizer isto às pessoas)
+## 5. Limites conhecidos
 
-- **L1 — O operador da instância entrega o código do cliente.** Na Fase 1 o cliente web é servido pelo próprio relay. Quem controla a instância pode servir JavaScript adulterado que lê as chaves. Isto vale para qualquer E2EE entregue por página web. Mitigações planejadas: build reproduzível com hash publicado; app local na Fase 2 (o cliente deixa de vir do servidor). Até lá: **use a instância de alguém em quem você confia, ou a sua.**
+- **L1 — O operador da instância entrega o código do cliente.** O cliente web é servido pelo próprio relay. Quem controla a instância pode servir JavaScript adulterado que lê as chaves. Isto vale para qualquer E2EE entregue por página web. O build reproduzível ajuda quem quiser conferir que a imagem publicada corresponde ao código, mas não impede um operador de trocar o cliente na própria instância. Por isso: **use a instância de alguém em quem você confia, ou a sua.**
 - **L2 — WASM exige o nível "Padrão" do Tor Browser.** O Tor Browser 15 bloqueia WebAssembly nos níveis "Safer" e "Safest" (via NoScript). O vodozemac é WASM. Logo o cliente só funciona no nível "Standard", que expõe mais superfície de ataque do navegador. Não verificado: se uma exceção de NoScript só para o `.onion` da instância funciona e é recomendável.
 - **L3 — Metadados.** O relay vê: identificador público de cada caixa, horário de cada envio e busca, tamanho dos blobs (com preenchimento, aproximado), e qual caixa entrega para qual. Ou seja, o grafo social e o ritmo das conversas. Tor esconde o IP, não esses padrões.
 - **L4 — Primeiro contato depende do canal do convite.** Se o canal externo (mensagem, papel, QR) estiver comprometido, a impressão digital pode ser trocada junto com o endereço.
 - **L5 — Dispositivo comprometido.** Malware ou acesso físico com o cliente desbloqueado lê tudo. A senha local só protege em repouso.
 - **L6 — Anonimato não é garantido.** Depende de como a pessoa hospeda e usa: VPS pago com cartão, conta de e-mail real, horários de uso e conteúdo das mensagens identificam pessoas. Hospedar em casa atrás do Tor é melhor, mas não é prova de anonimato.
 - **L7 — Disponibilidade.** O operador pode descartar, atrasar ou recusar mensagens. O protocolo detecta adulteração, não censura. Quem tem o endereço `.onion` também pode atrapalhar sem ser o operador: travar por um tempo o login de **uma** caixa cujo identificador conhece (o limite de login é por caixa), lotar a fila de 1000 mensagens de alguém ou criar caixas até o limite da instância. Pelo Tor não há IP para bloquear; a defesa do dono é ver as contas no painel, remover as estranhas e, se preciso, trocar o endereço.
-- **L8 — Auditoria.** O protocolo (vodozemac) foi auditado em 2022; este projeto (cola WASM, relay, cliente) **não foi auditado**. Auditoria externa é pré-requisito do lançamento público (Fase 3).
+- **L8 — Auditoria.** O protocolo (vodozemac) foi auditado em 2022; este projeto (cola WASM, relay, cliente) **não foi auditado**, e não há auditoria prevista. Quem for usar para algo sensível deve fazer ou contratar a própria revisão.
 - **L9 — O Tor Browser apaga os dados ao fechar.** Identidade, contatos e histórico só sobrevivem por meio do arquivo de backup exportado manualmente. Restaurar um backup antigo perde o que veio depois dele. Quem obtiver o arquivo pode tentar adivinhar a senha local offline (PBKDF2 com 600.000 iterações): use uma senha longa e guarde o arquivo com cuidado.
-- **L10 — iPhone e iPad não funcionam.** O cliente usa a criptografia do navegador (WebCrypto), que só existe em páginas tratadas como seguras. O Tor Browser trata `.onion` como seguro; o motor do Safari (WebKit), obrigatório em todo navegador de iPhone e iPad, inclusive o Onion Browser, não. Nesses aparelhos o app mostra um aviso e não abre. Trocar o WebCrypto por bibliotecas em JavaScript resolveria, mas mudaria a regra de usar só vodozemac e WebCrypto; fica para depois da auditoria.
+- **L10 — iPhone e iPad não funcionam.** O cliente usa a criptografia do navegador (WebCrypto), que só existe em páginas tratadas como seguras. O Tor Browser trata `.onion` como seguro; o motor do Safari (WebKit), obrigatório em todo navegador de iPhone e iPad, inclusive o Onion Browser, não. Nesses aparelhos o app mostra um aviso e não abre. Trocar o WebCrypto por bibliotecas em JavaScript resolveria, mas mudaria a regra de usar só vodozemac e WebCrypto; não está previsto.
 
 ## 6. Requisitos de segurança
 
@@ -83,7 +83,7 @@ Toda mudança no projeto é conferida contra estes requisitos:
 ## 7. Requisitos operacionais
 
 - Imagens: usuário sem root, sistema de arquivos somente leitura, sem segredos na imagem, versões fixadas por digest, assinadas (cosign), com SBOM e build reproduzível.
-- Tor: C Tor a partir de `deb.torproject.org` com verificação de assinatura, versão fixada. Arti reavaliado na Fase 2 (as notas da 2.5.1 ainda marcam partes dos circuitos onion como experimentais).
+- Tor: C Tor a partir de `deb.torproject.org` com verificação de assinatura, versão fixada. O Arti (Tor em Rust) não é usado: as notas da 2.5.1 ainda marcam partes dos serviços onion como experimentais.
 - Chave do serviço onion: volume dedicado, permissão `0700`, dono = usuário do Tor. Perder a chave = perder o endereço (todos os convites quebram). Vazar a chave = outra pessoa pode se passar pela instância. Backup cifrado e fora da máquina.
 - Painel: só no endereço local (`127.0.0.1` e `[::1]`); recusa nomes de host que não sejam locais (DNS rebinding), exige cabeçalho próprio em toda alteração (CSRF) e cookie `SameSite=Strict`; senha com hash argon2id e limite de tentativas. O backup da chave sai cifrado do navegador (PBKDF2 + AES-GCM); a restauração confere que a chave privada gera o endereço antes de gravar (falha fechada). Qualquer processo local alcança a porta: a senha é a barreira.
 - Registro: aberto a quem tem o endereço `.onion`, até o limite de caixas. O endereço funciona como o convite da instância.

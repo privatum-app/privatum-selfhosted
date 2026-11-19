@@ -2,11 +2,9 @@
 
 ## Estado atual
 
-**Pré-alfa. Não use para nada sensível.**
-
-- O relay, o cliente e a implantação com Tor existem e foram testados ponta a ponta, mas o projeto ainda é jovem e tem limites conhecidos (veja abaixo).
-- Nenhuma parte deste projeto passou por auditoria externa. A auditoria é pré-requisito do lançamento público.
-- Não há versões suportadas.
+- O relay, o cliente e a implantação com Tor foram testados ponta a ponta e têm limites conhecidos (veja abaixo e em [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md)).
+- Nenhuma parte deste projeto passou por auditoria externa, e não há auditoria prevista.
+- Não há versões com suporte garantido; correções, quando houver, saem só na versão mais recente.
 
 ## O que o projeto pretende garantir (e o que não)
 
@@ -19,7 +17,7 @@ O desenho completo, com adversários e limites, está em [docs/THREAT-MODEL.md](
 - O IP de quem usa e a localização de quem hospeda, via Tor.
 
 **Não protege:**
-- Contra quem opera a instância servir um cliente adulterado. Na Fase 1 o cliente web vem do próprio relay. Use uma instância sua ou de quem você confia.
+- Contra quem opera a instância servir um cliente adulterado. O cliente web vem do próprio relay. Use uma instância sua ou de quem você confia.
 - Metadados: o relay vê quem entrega para quem, quando e o tamanho aproximado.
 - Dispositivo comprometido (malware, acesso físico com o app aberto).
 - Censura: o operador pode descartar ou atrasar mensagens.
