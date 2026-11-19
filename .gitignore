@@ -12,6 +12,3 @@ target/
 *.sqlite
 *.sqlite-*
 onion-key.tar*
-
-# Instruções locais do assistente (não publicar)
-CLAUDE.md

@@ -1,7 +1,6 @@
 # Modelo de ameaças — Privatum autohospedado
 
 > Estado: **Fase 1, pré-alfa, implementada** (versão 0.2.5). O sistema descrito aqui está em uso, mas **não passou por auditoria externa**: não use para nada sensível.
-> Este projeto nasceu de um sistema anterior (Supabase + Stripe), cujo código não faz parte deste repositório. A seção 6 resume o que a auditoria daquele sistema encontrou e o que este projeto evita por construção.
 
 ## 1. Sistema avaliado
 
@@ -20,7 +19,7 @@ Convite: `<endereço>.onion` + **impressão digital da chave de identidade** de 
 
 | Ativo | Onde vive |
 |---|---|
-| Conteúdo de mensagens e arquivos | Só em texto claro no dispositivo de quem envia e de quem recebe |
+| Conteúdo das mensagens | Só em texto claro no dispositivo de quem envia e de quem recebe |
 | Chave de identidade (privada) | Dispositivo, cifrada em repouso por senha local que **nunca** sai do dispositivo |
 | Estado do ratchet (chaves de sessão) | Dispositivo |
 | Grafo social (quem fala com quem) | Inferível pelo relay |
@@ -66,22 +65,20 @@ Convite: `<endereço>.onion` + **impressão digital da chave de identidade** de 
 - **L9 — O Tor Browser apaga os dados ao fechar.** Identidade, contatos e histórico só sobrevivem por meio do arquivo de backup exportado manualmente. Restaurar um backup antigo perde o que veio depois dele. Quem obtiver o arquivo pode tentar adivinhar a senha local offline (PBKDF2 com 600.000 iterações): use uma senha longa e guarde o arquivo com cuidado.
 - **L10 — iPhone e iPad não funcionam.** O cliente usa a criptografia do navegador (WebCrypto), que só existe em páginas tratadas como seguras. O Tor Browser trata `.onion` como seguro; o motor do Safari (WebKit), obrigatório em todo navegador de iPhone e iPad, inclusive o Onion Browser, não. Nesses aparelhos o app mostra um aviso e não abre. Trocar o WebCrypto por bibliotecas em JavaScript resolveria, mas mudaria a regra de usar só vodozemac e WebCrypto; fica para depois da auditoria.
 
-## 6. Requisitos derivados da auditoria do sistema anterior
+## 6. Requisitos de segurança
 
-A Fase 0 (somente leitura, 2026-10-20) encontrou no sistema de origem problemas que este projeto deve evitar por construção:
+Toda mudança no projeto é conferida contra estes requisitos:
 
-| Achado no sistema anterior | Requisito na versão autohospedada |
-|---|---|
-| A senha que decifra a chave privada também é enviada ao servidor de autenticação | **R1.** O relay nunca recebe senha. Autenticação por assinatura de desafio com a chave de identidade. |
-| A chave pública do contato vem só do servidor; TOFU aceita o primeiro valor sem conferência | **R2.** A chave só é aceita se bater com a impressão digital do convite. Divergência ou ausência **bloqueia** a conversa. |
-| Regressão de RLS fez a busca de chaves voltar vazia e a verificação TOFU ser pulada em silêncio | **R3.** Falhas de verificação falham fechado: sem chave verificada, sem envio. |
-| Papéis de banco da plataforma ignoram RLS e podem ler sessões e inserir convites | **R4.** O relay não guarda nada que dê poder sobre contas: sem senhas, sem tokens de sessão de longa duração, sem chaves privadas, nem cifradas. |
-| Nome, tipo e tamanho de arquivo em texto claro | **R5.** Todo metadado de conteúdo vai dentro do texto cifrado; o relay vê só um blob com tamanho preenchido. |
-| Mensagens sem AAD; servidor pode reordenar ou mover | **R6.** Usar o envelope do Olm sem reinventar; ordem e duplicação detectadas pelo ratchet. |
-| Sem sigilo futuro | **R7.** Double Ratchet (vodozemac). |
-| CSP só por `<meta>`, sem `frame-ancestors`, sem `X-Frame-Options` | **R8.** O relay envia CSP, `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `Permissions-Policy`, COOP/CORP como cabeçalhos HTTP. |
-| Token de sessão em `localStorage` | **R9.** Nenhum segredo em `localStorage`; credenciais de curta duração em memória. |
-| Iterações de PBKDF2 vindas do servidor, sem piso | **R10.** Parâmetros de derivação de chave local fixados no cliente, nunca lidos do servidor. |
+- **R1.** O relay nunca recebe senha. A autenticação é por assinatura de desafio com a chave de identidade.
+- **R2.** A chave de um contato só é aceita se bater com a impressão digital do convite. Divergência ou ausência **bloqueia** a conversa.
+- **R3.** Falhas de verificação falham fechado: sem chave verificada, sem envio.
+- **R4.** O relay não guarda nada que dê poder sobre contas: sem senhas, sem tokens de sessão de longa duração, sem chaves privadas, nem cifradas.
+- **R5.** Todo metadado de conteúdo vai dentro do texto cifrado; o relay vê só um envelope com tamanho preenchido.
+- **R6.** O envelope do Olm é usado como está, sem reinventar; ordem e duplicação são detectadas pelo ratchet.
+- **R7.** Sigilo futuro pelo Double Ratchet (vodozemac).
+- **R8.** O relay envia CSP, `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `Permissions-Policy` e COOP/CORP como cabeçalhos HTTP.
+- **R9.** Nenhum segredo em `localStorage`; credenciais de curta duração ficam em memória.
+- **R10.** Os parâmetros de derivação da chave local são fixos no cliente, nunca lidos do servidor.
 
 ## 7. Requisitos operacionais
 
@@ -94,8 +91,6 @@ A Fase 0 (somente leitura, 2026-10-20) encontrou no sistema de origem problemas 
 
 ## 8. Em aberto
 
-- Formato exato do convite e do código de segurança mostrado às duas pessoas.
-- Política de retenção de blobs não entregues.
-- Como a pessoa recupera a identidade ao trocar de dispositivo sem confiar no relay.
+- Trocar de dispositivo hoje depende do arquivo de backup (L9); não há uso em vários dispositivos ao mesmo tempo.
 - Exceção de NoScript por site (L2): funciona? Reduz o risco de forma relevante?
-- As falhas públicas da libolm (AES com tabela vulnerável a cache-timing, base64 com vazamento de tempo, assinaturas Ed25519 maleáveis; CVE-2024-45192) são do código C da libolm, descontinuada em 2024; a recomendação da própria Matrix é migrar para o vodozemac. **Conferido no código do vodozemac 0.11.1 (2026-10-20):** em WASM o crate `aes` 0.9.3 usa o backend de software *fixsliced* (sem tabelas); chaves são decodificadas com `base64ct` (tempo constante); Ed25519 usa `verify_strict`. Resolvido para a versão fixada; reconferir a cada atualização.
+- Falhas públicas conhecidas da libolm, a biblioteca antiga em C que o vodozemac substitui (AES com tabela vulnerável a cache-timing, base64 com vazamento de tempo, assinaturas Ed25519 maleáveis; CVE-2024-45192), não se aplicam ao vodozemac: conferido no código da 0.11.1 em 2026-10-20 (AES por software sem tabelas no WASM, base64 de tempo constante, Ed25519 com `verify_strict`), e a 0.11.2 não mexeu nesses pontos. Reconferir a cada atualização.

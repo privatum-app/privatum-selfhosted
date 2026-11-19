@@ -156,7 +156,7 @@ docker compose up -d
 
 ### 3. Abra o painel
 
-Abra **`http://127.0.0.1:8099`** no navegador comum deste computador, ou, no **Docker Desktop**, clique no link **8099:8080** em **Containers → privatum → admin-1**. No primeiro acesso você cria a senha do painel. Veja [O painel](#o-painel).
+Abra **`http://127.0.0.1:8099`** no navegador comum deste computador, ou, no **Docker Desktop**, clique no link **8099:8080** em **Containers → privatum → admin-1** (o Docker mostra "porta neste computador : porta dentro do contêiner"; quem você abre é a **8099**, e só deste computador). No primeiro acesso você cria a senha do painel. Veja [O painel](#o-painel).
 
 No **Safari**, digite o endereço com `http://` e salve nos favoritos: pelo link do Docker Desktop ele tenta `https://` e não abre. Chrome e Firefox abrem pelo link.
 

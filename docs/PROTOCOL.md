@@ -8,7 +8,7 @@
 |---|---|
 | Protocolo de mensagens | Olm (Double Ratchet) via **vodozemac 0.11.2** (fixado; a 0.11.2 só traz correções de segurança sobre a 0.11.1, sem mudar o formato dos dados salvos), compilado para WASM. Configuração de sessão **v1** (a auditada e usada pela Matrix; a v2 ainda é experimental no vodozemac). Nenhuma primitiva própria. |
 | Relay | **Rust** (axum + tokio + SQLite). Assinaturas verificadas com `ed25519-dalek`. |
-| Cliente | Novo, enxuto (Vite + React + TypeScript), reaproveitando só componentes visuais do cliente antigo. |
+| Cliente | Vite + React + TypeScript, servido pela própria instância; toda a criptografia roda no navegador. |
 | Transporte | HTTP + WebSocket dentro do serviço onion. Sem TLS próprio. |
 | Escopo da Fase 1 | Conversas 1:1 e grupos de até 20 pessoas (por sessões de um para um), só texto, um dispositivo por identidade. Arquivos e multi-dispositivo ficam para depois. |
 
@@ -43,9 +43,9 @@ O relay nunca recebe senha.
 2. O cliente assina `"privatum-auth-v1" || onion_host || nonce` com a Ed25519 da `Account`.
 3. `POST /v1/auth/verify {mailbox_id, nonce, signature}` → `{token}` (aleatório, 32 bytes, vale 15 min, guardado só em memória no cliente e como hash no relay).
 
-## 4. API
+## 4. API do relay
 
-Todas as respostas levam os cabeçalhos de R8. Tamanhos máximos e limites de taxa são configuráveis.
+É como o app no navegador conversa com o relay (registrar, entrar, buscar chaves, enviar e receber). Não é uma API pública para outros sistemas. Todas as respostas levam os cabeçalhos de R8. Tamanhos máximos e limites de taxa são configuráveis.
 
 | Método e rota | Autenticação | Função |
 |---|---|---|
@@ -103,7 +103,7 @@ Nada de senha, chave privada (nem cifrada), nome, avatar ou lista de contatos (R
 
 ```
 deploy/
-  compose.yaml        # relay + tor, rede interna, sem portas publicadas
+  compose.yaml        # relay + tor + painel; relay e tor numa rede interna; só o painel é publicado, em 127.0.0.1:8099
   relay.Dockerfile    # build Rust multi-estágio -> imagem distroless, sem root, FS somente leitura
   tor.Dockerfile      # Debian fixado + tor de deb.torproject.org (assinatura verificada)
   torrc               # HiddenServiceDir no volume, HiddenServicePort 80 -> relay:8080
@@ -111,19 +111,9 @@ deploy/
 
 Volumes: `relay-data` (SQLite), `tor-state` (`0700`, chave do serviço onion), `onion-hostname`, `admin-data` e `admin-token` (painel); detalhes e backup em [OPERATIONS.md](OPERATIONS.md). Compilação de Rust e WASM dentro de contêineres; nada precisa ser instalado na máquina de quem hospeda além do Docker.
 
-## 8. Ordem de implementação (Etapa 3, concluída)
-
-1. **3b — Relay** em Rust: rotas acima, SQLite, limites de taxa, cabeçalhos, testes de integração.
-2. **3c — Docker + Tor**: `docker compose up` publica o relay como `.onion`.
-3. **3d — Cola WASM** sobre o vodozemac (`wasm-bindgen`): só expor `Account`, `Session` e *pickle*; nenhuma lógica criptográfica nova.
-4. **3e — Cliente** novo: criar identidade, senha local, convite, conversa, verificação do endereço autocertificável.
-5. **3f — Teste ponta a ponta** com dois perfis do Tor Browser em nível Standard. *Feito em 2026-10-20:* Tor Browser (nível Standard) → `.onion` → relay, conversando com um participante de teste no Node ligado à rede interna da instância. Mensagens nos dois sentidos, contato que iniciou a conversa marcado como "não verificado". Depois, até a v0.2.4, testado com Tor Browsers reais no macOS e no Android (inclusive o aviso no nível Safer) e com a instância hospedada no macOS e no Linux. A reconexão depois que o token expira (15 min) não foi testada isoladamente.
-6. **3g — Limpeza**: remover Supabase, Stripe, funções de borda, migrações e documentação do Privatum comercial. *Feito em 2026-10-20*, com o histórico do Git recomeçado do zero.
-
-Depois: Fase 2 (app local, Arti), Fase 3 (auditoria externa e lançamento).
-
 ## Em aberto
 
 - Política anti-spam para `POST /v1/messages` (hoje: só limite de taxa por caixa autenticada).
 - Ocultar o remetente do relay (*sealed sender*) — fora da Fase 1.
 - Rotação e reposição automática das chaves de uso único.
+- Próximas fases: Fase 2 (app local opcional, Arti) e Fase 3 (auditoria externa antes de divulgar ao público em geral).
