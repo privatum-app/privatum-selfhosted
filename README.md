@@ -263,7 +263,7 @@ O backup é cifrado com a sua senha local; quem tiver o arquivo pode tentar adiv
 ### Convite por QR, nome repetido e busca
 
 - **QR code:** o "Meu convite" mostra também um QR code. Se a câmera do celular abrir outro navegador, copie o link e cole no Tor Browser: endereços `.onion` só abrem nele.
-- **Nome repetido:** se alguém ainda não verificado escolhe o mesmo nome de um contato seu, a conversa mostra um aviso vermelho. Pode ser alguém se passando pela pessoa, ou ela com uma identidade nova; confira o código de segurança por outro meio. O código de um contato nunca muda: ele vem das chaves de identidade, e o app recusa chaves diferentes.
+- **Nome repetido:** o app não impede ninguém de escolher qualquer nome, e quem escolhe não vê aviso. O aviso aparece **para você**, quando dois contatos seus usam o mesmo nome e o mais novo ainda não foi verificado: a lista de conversas mostra a etiqueta vermelha "nome igual ao de outro contato" e a conversa mostra uma faixa vermelha. Pode ser alguém se passando por quem você já conhece, ou essa pessoa com uma identidade nova; confira o código de segurança por outro meio, e o aviso some. Ter o mesmo nome que você não gera aviso: o que importa são os seus contatos. O código de um contato nunca muda: ele vem das chaves de identidade, e o app recusa chaves diferentes.
 - **Busca** (lupa no topo da conversa): procura no histórico deste aparelho, sem diferenciar maiúsculas, minúsculas e acentos.
 
 ### Avatar, nome e som
@@ -295,15 +295,18 @@ No Tor Browser para Android, a lista de conversas e a conversa ocupam a tela int
 |---|---|
 | Hospedar no macOS (Apple Silicon), inclusive pelo pacote simples da v0.1.0 | testado |
 | Hospedar no Linux pelo pacote simples da v0.2.3 (Kali ARM64 no VirtualBox) | testado: instalação pelo README, conversa Android ↔ macOS, contas no painel, parar/iniciar mantendo endereço e conversas, backup da chave |
-| Hospedar no Windows | **não testado** (imagens publicadas para amd64 e arm64; a de amd64 foi compilada e executada) |
+| Hospedar no Windows pelo pacote simples da v0.2.5 | testado: conversa e grupo entre Windows, macOS e Android, parar/iniciar mantendo endereço e conversas, backup da chave |
+| Hospedar no macOS pelo pacote simples da v0.2.5, como usuário novo | testado (só com o README do GitHub; no Safari o painel precisa de `http://`) |
 | Conversar pelo Tor Browser no computador e no Android (15.0.24, 4G e Wi-Fi) | testado (funções da v0.1) |
 | Mensagem enviada com o destinatário offline e recebida depois de restaurar o backup | testado (Android → macOS) |
 | Painel: endereço, backup, restauração e troca do endereço, contas | testado (instância de teste e instância real no macOS) |
 | Grupos (inclusive encerrar o grupo), reações, busca, avatar, inglês, conta removida pelo painel com o app aberto | testado no Tor Browser (Android e macOS) |
-| Respostas, mensagens temporárias, troca de nome, nome repetido | testado em testes automáticos e num navegador local; **falta conferir no Tor Browser** |
+| Mensagens temporárias e troca de nome | testado no Tor Browser (Android e macOS) |
+| Nome repetido (3 contas: o aviso aparece para quem tem os dois contatos) | testado no Tor Browser (Windows, macOS e Android) |
+| Respostas | testado no Tor Browser |
 | Nível Safer do Tor Browser (deve mostrar a tela de ajuda) | testado |
-| Pacote simples (Linux: v0.2.3) | testado no Linux; **falta Windows** |
-| Onion Browser (iPhone) | testado: **incompatível** (sem WebCrypto em `.onion`); o app mostra um aviso |
+| Pacote simples | testado no macOS, Linux e Windows |
+| Onion Browser (iPhone) | testado: **incompatível** (sem WebCrypto em `.onion`); o app mostra a tela "Este navegador não é compatível" |
 | Brave com Tor | **não testado** |
 
 ## Como funciona

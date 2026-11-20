@@ -263,7 +263,7 @@ The backup is encrypted with your local passphrase; anyone who has the file can 
 ### QR invite, repeated name and search
 
 - **QR code:** "My invite" also shows a QR code. If the phone's camera opens another browser, copy the link and paste it into Tor Browser: `.onion` addresses only open there.
-- **Repeated name:** if someone not yet verified picks the same name as one of your contacts, the conversation shows a red warning. It may be someone pretending to be that person, or that person with a new identity; check the safety code through another channel. A contact's code never changes: it comes from the identity keys, and the app refuses different keys.
+- **Repeated name:** the app does not stop anyone from picking any name, and the person who picks it sees no warning. The warning shows **for you**, when two of your contacts use the same name and the newer one is not verified yet: the conversation list shows the red tag "same name as another contact" and the conversation shows a red banner. It may be someone pretending to be a person you already know, or that person with a new identity; check the safety code through another channel, and the warning goes away. Having the same name as you does not trigger it: what counts are your contacts. A contact's code never changes: it comes from the identity keys, and the app refuses different keys.
 - **Search** (magnifying glass at the top of the conversation): searches this device's history, ignoring case and accents.
 
 ### Avatar, name and sound
@@ -295,15 +295,18 @@ In Tor Browser for Android, the conversation list and the conversation take the 
 |---|---|
 | Hosting on macOS (Apple Silicon), including the v0.1.0 simple package | tested |
 | Hosting on Linux with the v0.2.3 simple package (Kali ARM64 in VirtualBox) | tested: install from the README, Android ↔ macOS chat, accounts in the panel, stop/start keeping address and conversations, key backup |
-| Hosting on Windows | **not tested** (images published for amd64 and arm64; the amd64 one was built and run) |
+| Hosting on Windows with the v0.2.5 simple package | tested: chat and group between Windows, macOS and Android, stop/start keeping address and conversations, key backup |
+| Hosting on macOS with the v0.2.5 simple package, as a new user | tested (using only the GitHub README; in Safari the panel needs `http://`) |
 | Chatting in Tor Browser on a computer and on Android (15.0.24, 4G and Wi-Fi) | tested (v0.1 features) |
 | Message sent while the recipient was offline and received after restoring the backup | tested (Android → macOS) |
 | Panel: address, backup, restore and address change, accounts | tested (test instance and real instance on macOS) |
 | Groups (including ending a group), reactions, search, avatar, English, account removed through the panel with the app open | tested in Tor Browser (Android and macOS) |
-| Replies, disappearing messages, name change, repeated name | tested by automated tests and in a local browser; **still to check in Tor Browser** |
+| Disappearing messages and name change | tested in Tor Browser (Android and macOS) |
+| Repeated name (3 accounts: the warning shows for whoever has both contacts) | tested in Tor Browser (Windows, macOS and Android) |
+| Replies | tested in Tor Browser |
 | Tor Browser Safer level (should show the help screen) | tested |
-| Simple package (Linux: v0.2.3) | tested on Linux; **Windows still to do** |
-| Onion Browser (iPhone) | tested: **not supported** (no WebCrypto on `.onion`); the app shows a notice |
+| Simple package | tested on macOS, Linux and Windows |
+| Onion Browser (iPhone) | tested: **not supported** (no WebCrypto on `.onion`); the app shows the "This browser is not supported" screen |
 | Brave with Tor | **not tested** |
 
 ## How it works
