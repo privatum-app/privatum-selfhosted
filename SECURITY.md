@@ -1,5 +1,7 @@
 # Segurança — Privatum autohospedado
 
+**Português** · [English](SECURITY.en.md)
+
 ## Estado atual
 
 - O relay, o cliente e a implantação com Tor foram testados ponta a ponta e têm limites conhecidos (veja abaixo e em [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md)).
@@ -30,6 +32,7 @@ Este projeto **não** afirma ser "100% seguro", ter "sigilo perfeito" ou ser "an
 - **Tor Browser no nível de segurança "Padrão" (Standard).** O cliente depende de JavaScript e WebAssembly. O nível "Safest" desliga JavaScript, e os níveis "Safer" e "Safest" bloqueiam WebAssembly (Tor Browser 15). O nível "Padrão" expõe mais superfície de ataque do navegador; entenda essa troca antes de usar.
 - **Exporte o backup antes de fechar o Tor Browser.** Ele apaga os dados dos sites ao fechar; sem o arquivo de backup, a identidade e as conversas se perdem. O arquivo é protegido só pela senha local: use uma senha longa.
 - **Confira a impressão digital.** O convite traz o endereço `.onion` e a impressão digital da chave de quem convida. Receba-o por um canal em que você confia e compare o código de segurança com a outra pessoa.
+- **iPhone e iPad não são compatíveis:** os navegadores deles não oferecem WebCrypto em endereços `.onion`.
 
 ## Requisitos para quem hospeda
 
@@ -39,6 +42,6 @@ Este projeto **não** afirma ser "100% seguro", ter "sigilo perfeito" ou ser "an
 
 ## Como relatar uma vulnerabilidade
 
-Envie para **contato@privatum.app**, com "Segurança" no assunto: o que encontrou, como reproduzir e a versão afetada. A resposta pode levar alguns dias: o projeto é mantido por uma pessoa.
+Envie para **contato@privatum.app**, com "Segurança" no assunto (em português ou inglês): o que encontrou, como reproduzir e a versão afetada. A resposta pode levar alguns dias: o projeto é mantido por uma pessoa.
 
 Não abra issue pública com detalhes de vulnerabilidade antes de uma correção estar publicada.
