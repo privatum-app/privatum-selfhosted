@@ -62,7 +62,7 @@ To stop: double-click `parar.bat` ("stop").
 2. Open **Docker Desktop** from the Applications folder and wait until it shows it is running.
 3. Download the latest `privatum-vX.Y.Z.zip` from [Releases](../../releases) and double-click it to extract (Safari may extract it on its own).
 4. In the extracted folder, **right-click** **`iniciar.command`** → **Open** → **Open**. The first time it must be done this way, because macOS blocks scripts downloaded from the internet; afterwards a double-click is enough.
-5. A Terminal window shows the progress. The first time, it downloads the images (about 200 MB). At the end, the [panel](#the-panel) opens in the browser.
+5. A Terminal window shows the progress. The first time, it downloads the images (about 200 MB). At the end, the [panel](#the-panel) opens in the browser. **In Safari**, if it does not open, type `http://127.0.0.1:8099` in the address bar, with the `http://` in front: without it Safari tries `https://` and fails. Chrome and Firefox open it directly.
 
 To stop: double-click `parar.command`.
 
