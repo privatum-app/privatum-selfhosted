@@ -4,7 +4,7 @@
 
 An end-to-end encrypted chat that anyone can run on their own machine with Docker. The instance is published as a Tor onion service, and you invite people with a link that carries the `.onion` address and your key's fingerprint. AGPL-3.0 license, non-commercial.
 
-> **Version 0.2.5.** The project **has not had an external audit**. Read [SECURITY.en.md](SECURITY.en.md) and [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) first: they say what the project protects and, above all, what it does **not** protect. The technical documents in `docs/` are in Portuguese.
+> **Version 0.2.6.** The project **has not had an external audit**. Read [SECURITY.en.md](SECURITY.en.md) and [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) first: they say what the project protects and, above all, what it does **not** protect. The technical documents in `docs/` are in Portuguese.
 
 ![A conversation in Privatum: conversation list, quoted reply, reactions and new-messages divider](docs/imagens/app-conversa.png)
 

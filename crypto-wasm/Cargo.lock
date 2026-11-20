@@ -443,7 +443,7 @@ dependencies = [
 
 [[package]]
 name = "privatum-crypto"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "data-encoding",
  "serde_json",

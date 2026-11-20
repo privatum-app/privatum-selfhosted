@@ -1,6 +1,6 @@
 # Modelo de ameaças — Privatum autohospedado
 
-> Estado: **implementado** (versão 0.2.5). O sistema descrito aqui está em uso e **não passou por auditoria externa**.
+> Estado: **implementado** (versão 0.2.6). O sistema descrito aqui está em uso e **não passou por auditoria externa**.
 
 ## 1. Sistema avaliado
 

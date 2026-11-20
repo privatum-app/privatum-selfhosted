@@ -1,6 +1,6 @@
 # Protocolo do relay e do convite
 
-> Estado: **implementado** (versão 0.2.5, sem auditoria externa). Requisitos R1–R10 e limites L1–L10 vêm de [THREAT-MODEL.md](THREAT-MODEL.md).
+> Estado: **implementado** (versão 0.2.6, sem auditoria externa). Requisitos R1–R10 e limites L1–L10 vêm de [THREAT-MODEL.md](THREAT-MODEL.md).
 
 ## Decisões
 
